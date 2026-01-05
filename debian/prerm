@@ -1,0 +1,40 @@
+#!/bin/bash
+# Digital Signage Toolkit - Pre-removal script
+# Stops services cleanly before uninstall
+
+set -e
+
+PKG_NAME="dst-toolkit"
+
+case "$1" in
+    remove|upgrade|deconfigure)
+        echo "[DST] Stopping services before removal..."
+        
+        # Stop and disable the Rise Vision player service
+        if systemctl is-active --quiet rise-vision-player 2>/dev/null; then
+            systemctl stop rise-vision-player || true
+        fi
+        if systemctl is-enabled --quiet rise-vision-player 2>/dev/null; then
+            systemctl disable rise-vision-player || true
+        fi
+        
+        # Stop and disable the reboot timer
+        if systemctl is-active --quiet scc-reboot.timer 2>/dev/null; then
+            systemctl stop scc-reboot.timer || true
+        fi
+        if systemctl is-enabled --quiet scc-reboot.timer 2>/dev/null; then
+            systemctl disable scc-reboot.timer || true
+        fi
+        
+        # Reload systemd to reflect changes
+        systemctl daemon-reload || true
+        
+        echo "[DST] Services stopped successfully."
+    ;;
+    
+    failed-upgrade)
+        # Nothing to do
+    ;;
+esac
+
+exit 0

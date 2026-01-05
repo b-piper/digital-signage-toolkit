@@ -1,0 +1,15 @@
+digital-signage-toolkit (2.0.0-1) unstable; urgency=medium
+
+  * Initial release of Digital Signage Toolkit GUI application
+  * Complete rewrite from Bash script to Python/PyQt6
+  * Features:
+    - Master Setup for new kiosks
+    - Audit & Fix for maintenance
+    - OS Upgrade with automatic snapshots
+    - Watchdog Management
+    - Full System Restore using Timeshift
+    - Hardware Monitoring
+  * Proper Debian package with system-wide installation
+
+ -- Southwestern CC IT <it@southwesterncc.edu>  Mon, 01 Jan 2024 12:00:00 +0000
+

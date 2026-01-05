@@ -1,0 +1,45 @@
+{
+  "urls": {
+    "teamviewer": "https://download.teamviewer.com/download/linux/teamviewer_amd64.deb",
+    "rise_vision": "https://storage.googleapis.com/install-versions.risevision.com/installer-lnx-64.sh"
+  },
+  "paths": {
+    "watchdog_script": "~/check_rise.sh",
+    "log_path": "~/rise_log.txt",
+    "player_dir": "~/rvplayer",
+    "player_startup": "~/rvplayer/scripts/start.sh",
+    "autostart_dir": "~/.config/autostart",
+    "desktop_file": "~/Desktop/SCC_Manager.desktop",
+    "error_log": "/tmp/scc_last_error.log",
+    "temp_dir": "/tmp",
+    "log_dir": "/var/log/digital-signage-toolkit",
+    "log_dir_fallback": "~/.local/log/digital-signage-toolkit"
+  },
+  "watchdog": {
+    "service_name": "rise-vision-player",
+    "service_file": "/etc/systemd/system/rise-vision-player.service",
+    "use_systemd": true
+  },
+  "reboot": {
+    "timer_name": "scc-reboot",
+    "time": "3:00 AM"
+  },
+  "thermal": {
+    "critical_threshold": 85.0,
+    "monitoring_enabled": true
+  },
+  "display": {
+    "auto_detect_resolution": true,
+    "force_resolution": false
+  },
+  "timeshift": {
+    "auto_snapshot_before_upgrade": true,
+    "auto_snapshot_before_fix": true,
+    "snapshot_type": "RSYNC",
+    "snapshot_location": "/timeshift"
+  },
+  "checksums": {
+    "teamviewer": "",
+    "rise_vision": ""
+  }
+}

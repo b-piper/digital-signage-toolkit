@@ -1,0 +1,22 @@
+#!/usr/bin/make -f
+# See debhelper(7) (uncomment to enable)
+# export DH_VERBOSE = 1
+
+%:
+	dh $@ --with python3
+
+override_dh_auto_install:
+	dh_auto_install
+	# Install desktop file
+	install -d debian/digital-signage-toolkit/usr/share/applications
+	install -m 644 debian/digital-signage-toolkit.desktop debian/digital-signage-toolkit/usr/share/applications/
+	# Install icon
+	install -d debian/digital-signage-toolkit/usr/share/pixmaps
+	install -m 644 debian/digital-signage-toolkit.png debian/digital-signage-toolkit/usr/share/pixmaps/ 2>/dev/null || true
+	# Install system config
+	install -d debian/digital-signage-toolkit/etc/digital-signage-toolkit
+	install -m 644 config.json debian/digital-signage-toolkit/etc/digital-signage-toolkit/
+
+override_dh_python3:
+	dh_python3
+

@@ -1,0 +1,30 @@
+Source: digital-signage-toolkit
+Section: admin
+Priority: optional
+Maintainer: Southwestern CC IT <it@southwesterncc.edu>
+Build-Depends: debhelper (>= 13), dh-python, python3-all, python3-setuptools
+Standards-Version: 4.6.0
+Homepage: https://github.com/southwesterncc/digital-signage-toolkit
+
+Package: digital-signage-toolkit
+Architecture: all
+Depends: ${python3:Depends}, ${misc:Depends},
+         python3-pyqt6 (>= 6.6.0),
+         python3-psutil (>= 5.9.0),
+         wget,
+         curl,
+         sudo
+Description: Professional GUI application for provisioning and maintaining Ubuntu Digital Signage Kiosks
+ Digital Signage Toolkit is a comprehensive management application for Ubuntu-based
+ digital signage kiosks. It provides:
+ .
+  * Master Setup - Complete system provisioning for new kiosks
+  * Audit & Fix - Maintenance operations for existing kiosks
+  * OS Upgrade - Safe, non-interactive OS upgrades with automatic snapshots
+  * Watchdog Management - Visual control for self-healing systems
+  * System Restore - Full system state restoration using Timeshift
+  * Hardware Monitoring - Real-time system health metrics
+ .
+ This application replaces manual Bash scripts with a modern, robust GUI interface
+ built with PyQt6, providing non-blocking operations and real-time feedback.
+

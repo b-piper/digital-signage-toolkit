@@ -1,0 +1,12 @@
+[Desktop Entry]
+Version=1.0
+Type=Application
+Name=Digital Signage Toolkit
+Comment=Manage Rise Vision & System Updates
+Exec=digital-signage-toolkit
+Icon=digital-signage-toolkit
+Terminal=false
+StartupNotify=true
+Categories=System;Settings;Administration;
+Keywords=signage;kiosk;system;administration;rise vision;
+
