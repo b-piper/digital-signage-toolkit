@@ -49,7 +49,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: python3, python3-venv, python3-pip, scrot, libxcb-cursor0, libxcb-keysyms1, libxcb-shape0, libxcb-icccm4, libxcb-image0, libxcb-randr0, libxcb-render-util0, libxcb-xinerama0, libxkbcommon-x11-0
+Depends: python3, python3-venv, python3-pip, python3-pyqt6, python3-psutil, scrot, libxcb-cursor0, libxcb-keysyms1, libxcb-shape0, libxcb-icccm4, libxcb-image0, libxcb-randr0, libxcb-render-util0, libxcb-xinerama0, libxkbcommon-x11-0
 Maintainer: IT Department <it@southwesterncc.edu>
 Description: Digital Signage Toolkit
  A comprehensive management utility for Rise Vision Player kiosks.
@@ -71,13 +71,14 @@ case "\$1" in
         
         # Create venv if not exists
         if [ ! -d "\$APP_DIR/venv" ]; then
-            python3 -m venv "\$APP_DIR/venv"
+            python3 -m venv --system-site-packages "\$APP_DIR/venv"
         fi
         
         # Install Pip Requirements
         echo "[DST] Installing Python Dependencies..."
         "\$APP_DIR/venv/bin/pip" install --upgrade pip
-        "\$APP_DIR/venv/bin/pip" install -r "\$APP_DIR/requirements.txt" || true
+        # Install only non-system packages (PyQt6 and psutil come from system)
+        "\$APP_DIR/venv/bin/pip" install qtawesome requests || true
         
         # Determine user facing launcher
         # We can't easily predict the user here, but we can set permissions so any user can run it
