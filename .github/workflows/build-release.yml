@@ -5,6 +5,9 @@ on:
     tags:
       - 'v*'  # Triggers on version tags like v2.1.0
 
+permissions:
+  contents: write  # Required for creating releases
+
 jobs:
   build:
     runs-on: ubuntu-22.04
