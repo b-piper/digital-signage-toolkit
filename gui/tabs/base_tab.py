@@ -47,6 +47,11 @@ class BaseTab(QWidget):
         return self.main_window.config
     
     @property
+    def config_manager(self):
+        """Alias for config - provides backward compatibility."""
+        return self.main_window.config
+    
+    @property
     def sudo_handler(self):
         """Access the sudo handler."""
         return self.main_window.sudo_handler
