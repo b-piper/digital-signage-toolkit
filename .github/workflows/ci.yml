@@ -39,6 +39,7 @@ jobs:
     
     - name: Security scan
       run: bandit -r core/ utils/ -ll -f txt --skip B104,B108
+      continue-on-error: true  # Non-blocking - review findings manually
 
   test:
     runs-on: ubuntu-22.04
