@@ -153,9 +153,14 @@ exec sudo /opt/${PKG_NAME}/venv/bin/python /opt/${PKG_NAME}/main.py "\$@"
 EOF
 chmod 755 "${BUILD_DIR}/usr/bin/${PKG_NAME}"
 
-# 7. Icon Handling (Placeholder)
-# If we had an icon, we'd copy it.
-# cp assets/icon.png "${BUILD_DIR}/usr/share/icons/hicolor/256x256/apps/${PKG_NAME}.png"
+# 7. Icon Handling
+echo "[*] Installing application icon..."
+if [ -f "branding/SCC Digital Signage Toolkit.png" ]; then
+    cp "branding/SCC Digital Signage Toolkit.png" "${BUILD_DIR}/usr/share/icons/hicolor/256x256/apps/${PKG_NAME}.png"
+    echo "    Icon installed from branding folder"
+else
+    echo "    WARNING: Icon not found in branding folder"
+fi
 
 # 8. Build Package
 echo "[*] Building .deb package..."
