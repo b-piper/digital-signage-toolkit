@@ -79,7 +79,7 @@ def main():
             
             sudo = SudoHandler()
             ops = SystemOperations(sudo)
-            hw = HardwareMonitor(sudo)
+            hw = HardwareMonitor()
             
             rise_status = ops.get_rise_player_status()
             
