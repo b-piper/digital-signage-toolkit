@@ -1,27 +1,91 @@
 # Deployment Guide
 
-## Quick Install (After GitHub Setup)
+## Quick Install
 
+One-line installer (recommended):
 ```bash
 curl -sSL https://raw.githubusercontent.com/b-piper/digital-signage-toolkit/main/install-remote.sh | sudo bash
 ```
 
 ## Manual Install
 
-Download the latest `.deb` from [Releases](https://github.com/b-piper/digital-signage-toolkit/releases) and install:
-
+Download from [Releases](https://github.com/b-piper/digital-signage-toolkit/releases):
 ```bash
 sudo apt install ./dst-toolkit_X.X.X_amd64.deb
 ```
 
+---
+
+## Auto-Update
+
+Kiosks automatically check for updates **daily at 3:00 AM**.
+
+To check auto-update status:
+```bash
+systemctl status dst-auto-update.timer
+```
+
+To force an immediate update:
+```bash
+sudo /opt/dst-toolkit/scripts/auto-update.sh
+```
+
+View update logs:
+```bash
+cat /var/log/dst-toolkit/auto-update.log
+```
+
+---
+
 ## Creating a Release
 
-1. **Update version** in `utils/config.py` (in `_default_config`)
-2. **Commit changes**: `git add . && git commit -m "Release v2.1.0"`
-3. **Tag the release**: `git tag v2.1.0`
-4. **Push with tags**: `git push origin main --tags`
+1. Commit your changes:
+   ```bash
+   git add . && git commit -m "Your changes"
+   ```
 
-GitHub Actions will automatically build and publish the `.deb` package.
+2. Tag the release:
+   ```bash
+   git tag v2.2.0
+   ```
+
+3. Push with tags:
+   ```bash
+   git push origin main --tags
+   ```
+
+GitHub Actions automatically builds and publishes the `.deb` package.
+
+---
+
+## Bulk Update (All Kiosks)
+
+### Using Ansible (Recommended)
+```bash
+cd monitoring/ansible
+ansible-playbook -i inventory/hosts.ini playbooks/update-dst.yml
+```
+
+### Manual SSH Loop
+```bash
+for ip in 192.168.1.{101..120}; do
+    ssh rise@$ip "curl -sSL https://raw.githubusercontent.com/b-piper/digital-signage-toolkit/main/install-remote.sh | sudo bash"
+done
+```
+
+---
+
+## Network Setup (Cisco Meraki)
+
+For DHCP environments, use **DHCP reservations** so kiosks get consistent IPs:
+
+1. Go to Meraki Dashboard → **Network-wide** → **Clients**
+2. Find each kiosk and note its MAC address
+3. Go to **Security & SD-WAN** → **Addressing & VLANs**
+4. Add **Fixed IP assignment** for each kiosk
+5. Update `monitoring/ansible/inventory/hosts.ini` with the reserved IPs
+
+---
 
 ## Environment Variables
 
@@ -32,14 +96,22 @@ GitHub Actions will automatically build and publish the `.deb` package.
 | `DST_SYSLOG_ENABLED` | Enable syslog forwarding (`true`/`false`) |
 | `DST_SYSLOG_ADDRESS` | Syslog address (default: `/dev/log`) |
 
-## Updating Kiosks
+---
+
+## Verifying Installation
+
+After install, verify the toolkit is working:
 
 ```bash
-# Pull latest and reinstall
-curl -sSL https://raw.githubusercontent.com/b-piper/digital-signage-toolkit/main/install-remote.sh | sudo bash
-```
+# Check service
+dst-toolkit --status
 
-Or if using apt repository:
-```bash
-sudo apt update && sudo apt upgrade dst-toolkit
+# Check health endpoint
+curl http://localhost:8080/health
+
+# Check auto-update timer
+systemctl status dst-auto-update.timer
+
+# Check version
+cat /opt/dst-toolkit/VERSION
 ```

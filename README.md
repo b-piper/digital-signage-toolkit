@@ -1,101 +1,162 @@
 # Digital Signage Toolkit
 
-An Enterprise-Grade management utility for Rise Vision Player kiosks on Linux (Ubuntu). 
+Enterprise-grade management utility for Rise Vision Player kiosks on Ubuntu Linux.
 
-> **Goal**: Solve the "Ladder Problem" (Remote Management) and ensure 99.9% uptime for digital signage.
+> **Goal**: Solve the "Ladder Problem" with remote management and ensure 99.9% uptime for digital signage.
+
+[![CI](https://github.com/b-piper/digital-signage-toolkit/actions/workflows/ci.yml/badge.svg)](https://github.com/b-piper/digital-signage-toolkit/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/b-piper/digital-signage-toolkit)](https://github.com/b-piper/digital-signage-toolkit/releases)
 
 ## Features
 
-- **Ladder-Free Management**:
-  - **Headless Mode**: check status via SSH (`dst-toolkit --status`).
-  - **Remote Screenshots**: verify display content (`dst-toolkit --screenshot`).
-  - **Email Alerts**: instant notification of service failures or disk issues.
-- **Automated Health**:
-  - **Daily Reboot**: prevents browser memory leaks via cron scheduler.
-  - **Emergency Heal**: automated fix for permissions, cache corruption, and zombie processes.
-  - **Process Watchdog**: deep inspection of `chrome`/`chromium` renderer processes.
-- **Deployment**:
-  - **Native `.deb` Package**: installs to `/opt` with dependency resolution.
-  - **One-Line Installer**: `install.sh` for rapid deployment.
+### Remote Management
+- **Health Endpoint**: Each kiosk exposes `http://kiosk-ip:8080/health` for monitoring
+- **Headless Mode**: Check status via SSH with `dst-toolkit --status`
+- **Remote Screenshots**: Verify display content with `dst-toolkit --screenshot`
+- **Fleet Management**: Ansible playbooks for bulk operations
 
-## Installation
+### Automated Maintenance
+- **Auto-Update**: Kiosks automatically update daily at 3 AM
+- **Daily Reboot**: Prevents browser memory leaks via cron scheduler
+- **Emergency Heal**: Automated fix for permissions, cache, and zombie processes
+- **Process Watchdog**: Deep inspection of Chrome/Chromium renderer processes
 
-### Option A: Debian Package (Recommended)
-Building the package (requires Linux build machine):
+### Monitoring & Alerting
+- **Prometheus Metrics**: `/metrics` endpoint for Grafana integration
+- **Email Alerts**: Instant notification of service failures or disk issues
+- **Fleet Status Script**: Quick overview of all kiosks from any PC
+
+---
+
+## Quick Install
+
 ```bash
-./scripts/build_deb.sh 1.0.0
-sudo apt install ./dst-toolkit_1.0.0_amd64.deb
+curl -sSL https://raw.githubusercontent.com/b-piper/digital-signage-toolkit/main/install-remote.sh | sudo bash
 ```
-This installs the app, dependencies, and creates the `dst-toolkit` command.
 
-### Option B: Script Install
+Or download the `.deb` from [Releases](https://github.com/b-piper/digital-signage-toolkit/releases):
 ```bash
-sudo bash scripts/install.sh
+sudo apt install ./dst-toolkit_X.X.X_amd64.deb
 ```
+
+---
 
 ## Usage
 
 ### GUI Mode
-Launch from the Applications menu or run:
+Launch from Applications menu or:
 ```bash
 dst-toolkit
 ```
 
 ### CLI / Headless Mode
-For remote management via SSH:
-
 ```bash
-# Get JSON status report (uptime, disk, service status)
+# Get JSON status report
 dst-toolkit --status
 
-# Output:
-# {
-#     "hostname": "kiosk-01",
-#     "rise_player": { "service_active": true, "renderer_count": 4 },
-#     "disk_free_gb": 12.5
-# }
-
-# Take a screenshot to verify content
+# Take a screenshot
 dst-toolkit --screenshot /tmp/screen.png
 
-# Run emergency repair (Clear cache, fix perms, restart)
+# Run emergency repair
 dst-toolkit --heal
 ```
+
+### Health Check API
+```bash
+# Check kiosk health
+curl http://kiosk-ip:8080/health
+
+# Prometheus metrics
+curl http://kiosk-ip:8080/metrics
+```
+
+---
+
+## Fleet Management
+
+See [MONITORING.md](MONITORING.md) for full details.
+
+### Quick Fleet Check
+```bash
+./scripts/check-fleet.sh
+```
+
+### Using Ansible
+```bash
+cd monitoring/ansible
+
+# Check health of all kiosks
+ansible-playbook -i inventory/hosts.ini playbooks/health-check.yml
+
+# Update DST on all kiosks
+ansible-playbook -i inventory/hosts.ini playbooks/update-dst.yml
+
+# Reboot all kiosks
+ansible-playbook -i inventory/hosts.ini playbooks/reboot-all.yml
+```
+
+---
 
 ## Configuration
 
 ### SMTP Alerts
-1. Open GUI -> **Alerts Tab**.
-2. Configure SMTP Host (e.g., `smtp.office365.com`), Port (`587`), and Auth.
-3. Click "Send Test Email".
-4. Enable "Active Monitoring".
+1. Open GUI → **Alerts Tab**
+2. Configure SMTP Host, Port, and Auth
+3. Click "Send Test Email"
+4. Enable "Active Monitoring"
 
 ### Scheduling
-1. Open GUI -> **Scheduler Tab**.
-2. Set "Daily Reboot" time (Default: 03:00 AM).
-3. Click "Apply". This updates `/etc/cron.d`.
+1. Open GUI → **Scheduler Tab**
+2. Set "Daily Reboot" time (Default: 03:00 AM)
+3. Click "Apply"
 
-## Development
+### Environment Variables
 
-- **Source**: `/opt/dst-toolkit` (Default install location)
-- **Virtual Env**: `/opt/dst-toolkit/venv`
-- **Logs**: `~/.dst-toolkit/logs/` (or via GUI Log Viewer)
+| Variable | Purpose |
+|----------|---------|
+| `DST_CONFIG_PATH` | Custom config file location |
+| `DST_SMTP_PASSWORD` | SMTP password (avoid storing in config) |
+| `DST_SYSLOG_ENABLED` | Enable syslog forwarding |
 
-### Project Structure
+---
+
+## Project Structure
+
 ```
 ├── core/               # Backend logic (System Ops, Watchdog, Alerts)
-├── gui/                # PyQt6 Reference Implementation
-│   ├── tabs/           # Feature Tabs (Monitoring, Scheduler, Alerts)
-│   └── themes.py       # "Zinc" Dark Theme definition
-├── scripts/            # Build & Install scripts
+├── gui/                # PyQt6 GUI
+│   └── tabs/           # Feature Tabs (Monitoring, Scheduler, Alerts)
+├── monitoring/         # Prometheus, Grafana, Ansible setup
+│   └── ansible/        # Fleet management playbooks
+├── scripts/            # Build & maintenance scripts
 └── main.py             # Entry point
 ```
 
+---
+
+## Documentation
+
+- [DEPLOYMENT.md](DEPLOYMENT.md) - Installation and release guide
+- [MONITORING.md](MONITORING.md) - Fleet monitoring setup
+- [ARCHITECTURE.md](ARCHITECTURE.md) - Technical architecture
+- [CONTRIBUTING.md](CONTRIBUTING.md) - Development guide
+
+---
+
 ## Maintenance
 
-To uninstall:
+### Uninstall
 ```bash
 sudo apt remove dst-toolkit
-# or
-sudo rm -rf /opt/dst-toolkit /usr/share/applications/dst-toolkit.desktop
 ```
+
+### Logs
+- Application: `/var/log/dst-toolkit/application.log`
+- Auto-update: `/var/log/dst-toolkit/auto-update.log`
+- User logs: `~/.dst-toolkit/logs/`
+
+---
+
+## License
+
+Developed for Southwestern Community College IT Department.
