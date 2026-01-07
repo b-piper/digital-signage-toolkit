@@ -130,7 +130,20 @@ EOF
 
 chmod 755 "${BUILD_DIR}/DEBIAN/postinst"
 
-# 5. Create Desktop Entry
+# 5. Create GUI Launcher Wrapper
+echo "[*] Creating GUI Launcher Wrapper..."
+cat <<EOF > "${BUILD_DIR}/usr/bin/${PKG_NAME}-gui"
+#!/bin/bash
+# Wrapper to launch DST as root from GUI, preserving display environment
+if [ -z "\$DISPLAY" ]; then
+    export DISPLAY=:0
+fi
+# Use pkexec to run as root, passing necessary X11/Wayland variables
+pkexec env DISPLAY=\$DISPLAY XAUTHORITY=\$XAUTHORITY /opt/${PKG_NAME}/venv/bin/python /opt/${PKG_NAME}/main.py
+EOF
+chmod 755 "${BUILD_DIR}/usr/bin/${PKG_NAME}-gui"
+
+# 6. Create Desktop Entry
 echo "[*] Creating Desktop Entry..."
 cat <<EOF > "${BUILD_DIR}/usr/share/applications/${PKG_NAME}.desktop"
 [Desktop Entry]
@@ -138,15 +151,15 @@ Version=1.0
 Type=Application
 Name=Digital Signage Toolkit
 Comment=Manage Rise Vision Player & System Health
-Exec=pkexec /opt/${PKG_NAME}/venv/bin/python /opt/${PKG_NAME}/main.py
+Exec=${PKG_NAME}-gui
 Icon=${PKG_NAME}
 Terminal=false
 Categories=System;Settings;
 EOF
 
-# 6. Create Symlink Launcher
-echo "[*] Creating Launcher Symlink..."
-# We create a script in /usr/bin that calls the venv python
+# 7. Create Symlink Launcher (CLI)
+echo "[*] Creating CLI Launcher Symlink..."
+# We create a script in /usr/bin for CLI usage (sudo)
 cat <<EOF > "${BUILD_DIR}/usr/bin/${PKG_NAME}"
 #!/bin/bash
 exec sudo /opt/${PKG_NAME}/venv/bin/python /opt/${PKG_NAME}/main.py "\$@"
