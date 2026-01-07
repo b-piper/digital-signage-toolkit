@@ -51,8 +51,19 @@ def main():
     parser.add_argument('--screenshot', type=str, help="Take a screenshot to the specified path (Headless)")
     parser.add_argument('--gui', action='store_true', help="Force GUI mode (Default if no args)")
     parser.add_argument('--config', type=str, help="Path to custom config.json file (for fleet deployment)")
+    parser.add_argument('--no-health-server', action='store_true', help="Disable HTTP health check server")
+    parser.add_argument('--health-port', type=int, default=8080, help="Port for health check server (default: 8080)")
     
     args = parser.parse_args()
+    
+    # Start health check server (background, for monitoring)
+    if not args.no_health_server and not args.status:
+        try:
+            from digital_signage_toolkit.core.health_server import start_health_server
+            if start_health_server(args.health_port):
+                logger.app_logger.info(f"Health server started on port {args.health_port}")
+        except Exception as e:
+            logger.app_logger.warning(f"Could not start health server: {e}")
     
     # Apply custom config if provided
     if args.config:

@@ -1,0 +1,36 @@
+---
+# Update Digital Signage Toolkit on all kiosks
+# Run: ansible-playbook -i inventory/hosts.ini playbooks/update-dst.yml
+
+- name: Update Digital Signage Toolkit
+  hosts: kiosks
+  become: yes
+
+  tasks:
+    - name: Download and run DST installer
+      shell: |
+        curl -sSL https://raw.githubusercontent.com/b-piper/digital-signage-toolkit/main/install-remote.sh | bash
+      args:
+        executable: /bin/bash
+      register: install_result
+      changed_when: "'Installing' in install_result.stdout"
+
+    - name: Show install result
+      debug:
+        msg: "{{ install_result.stdout_lines[-5:] }}"
+      when: install_result.stdout_lines | length > 0
+
+    - name: Verify installation
+      stat:
+        path: /opt/dst-toolkit/VERSION
+      register: version_file
+
+    - name: Get installed version
+      command: cat /opt/dst-toolkit/VERSION
+      register: version
+      when: version_file.stat.exists
+      changed_when: false
+
+    - name: Report version
+      debug:
+        msg: "{{ inventory_hostname }} is running DST version {{ version.stdout | default('unknown') }}"

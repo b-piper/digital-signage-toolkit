@@ -105,6 +105,23 @@ case "\$1" in
         if [ -n "\$SUDO_USER" ]; then
             usermod -aG dst-toolkit "\$SUDO_USER" 2>/dev/null || true
         fi
+        
+        # Create VERSION file
+        echo "[DST] Creating version file..."
+        echo "${VERSION}" > "\$APP_DIR/VERSION"
+        
+        # Install systemd units for auto-update
+        echo "[DST] Setting up auto-update timer..."
+        if [ -d /etc/systemd/system ]; then
+            cp "\$APP_DIR/debian/dst-auto-update.timer" /etc/systemd/system/ 2>/dev/null || true
+            cp "\$APP_DIR/debian/dst-auto-update.service" /etc/systemd/system/ 2>/dev/null || true
+            systemctl daemon-reload
+            systemctl enable dst-auto-update.timer 2>/dev/null || true
+            systemctl start dst-auto-update.timer 2>/dev/null || true
+        fi
+        
+        # Make scripts executable
+        chmod +x "\$APP_DIR/scripts/"*.sh 2>/dev/null || true
     ;;
 esac
 

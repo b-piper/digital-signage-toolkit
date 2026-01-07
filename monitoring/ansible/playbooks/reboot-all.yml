@@ -1,0 +1,35 @@
+---
+# Reboot all kiosks (run during off-hours)
+# Run: ansible-playbook -i inventory/hosts.ini playbooks/reboot-all.yml
+
+- name: Reboot All Kiosks
+  hosts: kiosks
+  become: yes
+  serial: 5  # Reboot 5 at a time
+
+  tasks:
+    - name: Clear Rise Vision cache before reboot
+      shell: |
+        rm -rf ~/.config/Rise\ Vision\ Player/Cache 2>/dev/null || true
+        rm -rf ~/.config/Rise\ Vision\ Player/GPUCache 2>/dev/null || true
+      become_user: rise
+      changed_when: false
+      failed_when: false
+
+    - name: Reboot the kiosk
+      reboot:
+        reboot_timeout: 300
+        msg: "Scheduled reboot by DST management"
+
+    - name: Wait for Rise Vision to start
+      shell: pgrep -f "Rise Vision"
+      register: rise_check
+      until: rise_check.rc == 0
+      retries: 30
+      delay: 10
+      changed_when: false
+      failed_when: false
+
+    - name: Report reboot status
+      debug:
+        msg: "{{ inventory_hostname }} rebooted successfully. Rise Vision: {{ 'running' if rise_check.rc == 0 else 'not started yet' }}"

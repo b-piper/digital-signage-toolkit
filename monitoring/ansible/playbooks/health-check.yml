@@ -1,0 +1,53 @@
+---
+# Health check all kiosks
+# Run: ansible-playbook -i inventory/hosts.ini playbooks/health-check.yml
+
+- name: Health Check All Kiosks
+  hosts: kiosks
+  gather_facts: yes
+
+  tasks:
+    - name: Check Rise Vision status
+      shell: pgrep -f "Rise Vision" > /dev/null && echo "running" || echo "stopped"
+      register: rise_status
+      changed_when: false
+      failed_when: false
+
+    - name: Get disk usage
+      shell: df -h / | tail -1 | awk '{print $5}'
+      register: disk_usage
+      changed_when: false
+
+    - name: Get memory usage
+      shell: free | grep Mem | awk '{printf "%.0f%%", $3/$2 * 100.0}'
+      register: memory_usage
+      changed_when: false
+
+    - name: Get DST version
+      command: cat /opt/dst-toolkit/VERSION
+      register: dst_version
+      changed_when: false
+      failed_when: false
+
+    - name: Get uptime
+      shell: uptime -p
+      register: uptime_info
+      changed_when: false
+
+    - name: Display health status
+      debug:
+        msg: |
+          =======================================
+          Kiosk: {{ inventory_hostname }}
+          =======================================
+          Rise Vision: {{ rise_status.stdout }}
+          Disk Usage:  {{ disk_usage.stdout }}
+          Memory:      {{ memory_usage.stdout }}
+          DST Version: {{ dst_version.stdout | default('not installed') }}
+          Uptime:      {{ uptime_info.stdout }}
+
+    - name: Set warning for stopped Rise Vision
+      fail:
+        msg: "WARNING: Rise Vision is not running on {{ inventory_hostname }}"
+      when: rise_status.stdout == "stopped"
+      ignore_errors: yes

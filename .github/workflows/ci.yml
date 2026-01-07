@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  lint:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install linter
+      run: pip install ruff
+    
+    - name: Run ruff
+      run: ruff check . --output-format=github
+
+  security:
+    runs-on: ubuntu-22.04
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install bandit
+      run: pip install bandit
+    
+    - name: Security scan
+      run: bandit -r core/ utils/ -ll -f txt
+
+  test:
+    runs-on: ubuntu-22.04
+    needs: [lint]
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.11'
+    
+    - name: Install dependencies
+      run: |
+        pip install pytest pytest-cov psutil requests
+        pip install -e . || true
+    
+    - name: Run tests
+      run: pytest tests/ -v --tb=short --ignore=tests/test_gui.py
+      env:
+        PYTHONPATH: ${{ github.workspace }}
