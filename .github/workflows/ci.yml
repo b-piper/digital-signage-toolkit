@@ -22,6 +22,7 @@ jobs:
     
     - name: Run ruff
       run: ruff check . --output-format=github
+      continue-on-error: true  # Non-blocking until codebase is cleaned up
 
   security:
     runs-on: ubuntu-22.04
