@@ -22,8 +22,9 @@ class WatchdogManager:
         self.player_startup = config.expand_path('paths.player_startup')
         self.service_name = config.get('watchdog.service_name', 'rise-vision-player')
         self.service_file = Path(config.get('watchdog.service_file', f'/etc/systemd/system/{self.service_name}.service'))
-        self.current_user = os.environ.get('USER', 'root')
-        self.current_home = os.path.expanduser('~')
+        # Use the real user (SUDO_USER), not root
+        self.current_user = os.environ.get('SUDO_USER', os.environ.get('USER', 'root'))
+        self.current_home = config.get_real_user_home()
         self.logger = get_logger()
         self._service_creation_lock = threading.Lock()  # Prevent race conditions
         self.last_error = ""  # Human-readable error from last failed operation

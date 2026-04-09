@@ -167,7 +167,10 @@ class SoftwareInstaller:
                            log_callback: Optional[Callable[[str], None]] = None,
                            completion_callback: Optional[Callable[[bool], None]] = None) -> None:
         """Install Rise Vision Player (synchronous, with proper display env)."""
-        startup_path = Path(os.path.expanduser(startup_script_path))
+        # Resolve ~ to the REAL user's home, not /root
+        real_home = self.config.get_real_user_home()
+        resolved_startup = startup_script_path.replace('~', real_home, 1) if startup_script_path.startswith('~') else startup_script_path
+        startup_path = Path(resolved_startup)
 
         if startup_path.exists() and startup_path.stat().st_size > 0:
             if log_callback:
@@ -220,25 +223,50 @@ class SoftwareInstaller:
         # Make executable and launch
         if installer_path:
             os.chmod(installer_path, 0o755)
+
+            # Ensure dbus-x11 is installed (provides dbus-launch needed by the installer)
             if log_callback:
-                log_callback("Launching Rise Vision installer (silent)...")
+                log_callback("Ensuring dbus-x11 is installed (required by Rise Vision installer)...")
+            self.sudo.run_command(['apt-get', 'install', '-y', 'dbus-x11'], timeout=120)
+
+            if log_callback:
+                log_callback("Launching Rise Vision installer...")
+
+            # Determine the real user to run the installer as
+            sudo_user = os.environ.get('SUDO_USER', '')
+            if not sudo_user:
+                # Fallback: try to find a non-root user
+                try:
+                    import pwd
+                    for pw in pwd.getpwall():
+                        if pw.pw_uid >= 1000 and pw.pw_shell not in ('/usr/sbin/nologin', '/bin/false'):
+                            sudo_user = pw.pw_name
+                            break
+                except Exception:
+                    pass
 
             # Set up environment with display access for the installer
             env = os.environ.copy()
             env['DISPLAY'] = os.environ.get('DISPLAY', ':0')
-            # Try to find XAUTHORITY
-            sudo_user = os.environ.get('SUDO_USER', '')
             if sudo_user:
                 xauth = f"/home/{sudo_user}/.Xauthority"
+                env['HOME'] = f"/home/{sudo_user}"
+                env['USER'] = sudo_user
             else:
                 xauth = os.path.expanduser("~/.Xauthority")
+                env['HOME'] = os.path.expanduser('~')
             env['XAUTHORITY'] = os.environ.get('XAUTHORITY', xauth)
-            env['HOME'] = os.environ.get('SUDO_HOME', os.path.expanduser('~'))
 
             try:
+                # Build command — run as the actual user if possible
+                if sudo_user and os.geteuid() == 0:
+                    cmd = ['sudo', '-u', sudo_user, '-E', installer_path]
+                else:
+                    cmd = [installer_path]
+
                 # Run the installer and wait for completion (synchronous)
                 process = subprocess.Popen(
-                    [installer_path],
+                    cmd,
                     stdout=subprocess.PIPE,
                     stderr=subprocess.PIPE,
                     text=True,
@@ -258,6 +286,7 @@ class SoftwareInstaller:
                         else:
                             if log_callback:
                                 log_callback("⚠️ Installer completed but startup script not yet found")
+                                log_callback(f"Expected at: {startup_path}")
                                 log_callback("The player may need a reboot to complete setup")
                         if completion_callback:
                             completion_callback(True)

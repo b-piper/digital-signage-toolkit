@@ -224,7 +224,33 @@ class Config:
         config[keys[-1]] = value
 
     def expand_path(self, path_key: str) -> str:
-        """Expand a path from config with ~ and environment variables."""
+        """Expand a path from config with ~ and environment variables.
+
+        When running as root via pkexec/sudo, ~ is resolved to the actual
+        user's home directory (via SUDO_USER) rather than /root.
+        """
         path = self.get(path_key, "")
-        return os.path.expanduser(os.path.expandvars(path))
+        path = os.path.expandvars(path)
+        # Replace ~ with the real user's home, not root's
+        if path.startswith('~'):
+            real_home = self.get_real_user_home()
+            path = path.replace('~', real_home, 1)
+        return path
+
+    @staticmethod
+    def get_real_user_home() -> str:
+        """Get the real user's home directory.
+
+        When running as root via sudo/pkexec, returns the home directory
+        of the actual user (SUDO_USER), not /root.
+        """
+        sudo_user = os.environ.get('SUDO_USER', '')
+        if sudo_user and os.geteuid() == 0:
+            # Running as root via sudo — use the original user's home
+            try:
+                import pwd
+                return pwd.getpwnam(sudo_user).pw_dir
+            except (ImportError, KeyError):
+                return f'/home/{sudo_user}'
+        return os.path.expanduser('~')
 
