@@ -120,6 +120,9 @@ case "\$1" in
         if [ -d /etc/systemd/system ]; then
             cp "\$APP_DIR/debian/dst-auto-update.timer" /etc/systemd/system/ 2>/dev/null || true
             cp "\$APP_DIR/debian/dst-auto-update.service" /etc/systemd/system/ 2>/dev/null || true
+            # systemd requires unit files to NOT be executable
+            chmod 644 /etc/systemd/system/dst-auto-update.timer 2>/dev/null || true
+            chmod 644 /etc/systemd/system/dst-auto-update.service 2>/dev/null || true
             systemctl daemon-reload 2>/dev/null || true
             systemctl enable dst-auto-update.timer 2>/dev/null || true
             systemctl start dst-auto-update.timer 2>/dev/null || true
