@@ -3,7 +3,7 @@ import json
 import os
 import subprocess
 import threading
-from http.server import HTTPServer, BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
 
 try:
@@ -14,7 +14,7 @@ except ImportError:
 
 class HealthCheckHandler(BaseHTTPRequestHandler):
     """HTTP handler for health check endpoint."""
-    
+
     def do_GET(self):
         """Handle GET requests."""
         if not self._check_auth():
@@ -27,33 +27,33 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
-    
+
     def _check_auth(self) -> bool:
         """Verify authentication token."""
         # Lazily import Config to avoid circular imports if any
         from digital_signage_toolkit.utils.config import Config
         config = Config()
-        
+
         # Check if auth is required (default to False for backward compatibility if missing)
         security = config.get('security', {})
         if not security.get('require_auth', False):
             return True
-            
+
         # Get expected token (Env var overrides config)
         expected_token = os.environ.get('DST_API_TOKEN') or security.get('api_token')
-        
+
         # If auth required but no token configured, deny access (Fail Secure)
         if not expected_token or expected_token == 'CHANGEME':
             print("Security Warning: Auth required but token not set/default.")
             self._send_unauthorized("Configuration Error: API Token not set")
             return False
-            
+
         # Check header
         provided_token = self.headers.get('X-Auth-Token')
         if provided_token != expected_token:
             self._send_unauthorized()
             return False
-            
+
         return True
 
     def _send_unauthorized(self, message: str = "Unauthorized"):
@@ -67,13 +67,13 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         """Return health status."""
         health = get_health_status()
         status_code = 200 if health.get('healthy', False) else 503
-        
+
         self.send_response(status_code)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
         self.wfile.write(json.dumps(health, indent=2).encode())
-    
+
 
     def log_message(self, format, *args):
         """Suppress default logging."""
@@ -88,32 +88,32 @@ def get_health_status() -> dict:
         'version': _get_version(),
         'checks': {}
     }
-    
+
     # Check Rise Vision status
     rise_status = _check_rise_vision()
     status['checks']['rise_vision'] = rise_status
     if not rise_status['running']:
         status['healthy'] = False
-    
+
     # Check disk space
     disk_status = _check_disk_space()
     status['checks']['disk'] = disk_status
     if disk_status['critical']:
         status['healthy'] = False
-    
+
     # Check memory
     memory_status = _check_memory()
     status['checks']['memory'] = memory_status
     if memory_status['critical']:
         status['healthy'] = False
-    
+
     # Check CPU
     cpu_status = _check_cpu()
     status['checks']['cpu'] = cpu_status
-    
+
     # System uptime
     status['uptime_seconds'] = _get_uptime()
-    
+
     return status
 
 
@@ -158,7 +158,7 @@ def _check_disk_space() -> dict:
     """Check disk space usage."""
     if not psutil:
         return {'percent': 0, 'critical': False, 'error': 'psutil not available'}
-    
+
     try:
         disk = psutil.disk_usage('/')
         critical = disk.percent >= 90
@@ -178,7 +178,7 @@ def _check_memory() -> dict:
     """Check memory usage."""
     if not psutil:
         return {'percent': 0, 'critical': False, 'error': 'psutil not available'}
-    
+
     try:
         memory = psutil.virtual_memory()
         critical = memory.percent >= 95
@@ -198,7 +198,7 @@ def _check_cpu() -> dict:
     """Check CPU usage."""
     if not psutil:
         return {'percent': 0, 'error': 'psutil not available'}
-    
+
     try:
         cpu_percent = psutil.cpu_percent(interval=0.1)
         return {
@@ -213,7 +213,7 @@ def _get_uptime() -> int:
     """Get system uptime in seconds."""
     if not psutil:
         return 0
-    
+
     try:
         import time
         boot_time = psutil.boot_time()
@@ -224,23 +224,26 @@ def _get_uptime() -> int:
 
 class HealthServer:
     """Health check HTTP server."""
-    
+
     def __init__(self, port: int = 8080):
         self.port = port
         self.server: Optional[HTTPServer] = None
         self._thread: Optional[threading.Thread] = None
-    
+
     def start(self) -> bool:
         """Start the health server in a background thread."""
         try:
-            self.server = HTTPServer(('0.0.0.0', self.port), HealthCheckHandler)
+            from digital_signage_toolkit.utils.config import Config
+            config = Config()
+            bind_addr = config.get('network.health_server_bind_address', '127.0.0.1')
+            self.server = HTTPServer((bind_addr, self.port), HealthCheckHandler)
             self._thread = threading.Thread(target=self.server.serve_forever, daemon=True)
             self._thread.start()
             return True
         except Exception as e:
             print(f"Failed to start health server: {e}")
             return False
-    
+
     def stop(self):
         """Stop the health server."""
         if self.server:
@@ -262,10 +265,10 @@ def start_health_server(port: int = 8080) -> bool:
         True if started successfully
     """
     global _health_server
-    
+
     if _health_server is not None:
         return True  # Already running
-    
+
     _health_server = HealthServer(port)
     return _health_server.start()
 
@@ -273,7 +276,7 @@ def start_health_server(port: int = 8080) -> bool:
 def stop_health_server():
     """Stop the global health server."""
     global _health_server
-    
+
     if _health_server:
         _health_server.stop()
         _health_server = None
@@ -282,10 +285,10 @@ def stop_health_server():
 if __name__ == '__main__':
     # Run standalone for testing
     import time
-    
+
     print("Starting health server on port 8080...")
     print("Test with: curl http://localhost:8080/health")
-    
+
     if start_health_server(8080):
         print("Server started. Press Ctrl+C to stop.")
         try:

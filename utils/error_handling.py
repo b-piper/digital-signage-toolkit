@@ -1,6 +1,7 @@
 """Error handling utilities and decorators."""
 import functools
-from typing import Callable, Any, Optional
+from typing import Any, Callable, Optional
+
 from digital_signage_toolkit.utils.logger import get_logger
 
 
@@ -29,7 +30,7 @@ def log_operation_errors(operation_name: str, return_on_error: Any = False):
     return decorator
 
 
-def log_operation_errors_with_message(operation_name: str, 
+def log_operation_errors_with_message(operation_name: str,
                                      return_on_error: Any = False,
                                      error_message: Optional[str] = None):
     """Decorator to log errors and optionally return a tuple (success, message).
@@ -53,7 +54,7 @@ def log_operation_errors_with_message(operation_name: str,
             except Exception as e:
                 error_msg = error_message or str(e)
                 logger.log_error(e, operation_name)
-                
+
                 # If function returns tuple, return tuple with error message
                 if isinstance(return_on_error, tuple):
                     return (return_on_error[0], error_msg)

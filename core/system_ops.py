@@ -1,38 +1,38 @@
 """System operations module."""
-import subprocess
 import os
+import shutil
 import socket
+import subprocess
 import tempfile
 from pathlib import Path
-from typing import Optional, Tuple, Dict, Any
-import shutil
-import time
-from digital_signage_toolkit.utils.sudo_handler import SudoHandler
-from digital_signage_toolkit.utils.logger import get_logger
+from typing import Any, Dict, Optional, Tuple
+
 from digital_signage_toolkit.utils.error_handling import (
     log_operation_errors,
     log_operation_errors_with_message,
 )
+from digital_signage_toolkit.utils.logger import get_logger
+from digital_signage_toolkit.utils.sudo_handler import SudoHandler
 
 
 class SystemOperations:
     """Handles system-level operations."""
-    
+
     def __init__(self, sudo_handler: SudoHandler):
         self.sudo = sudo_handler
         self.logger = get_logger()
-    
+
     @log_operation_errors("CHECK_INTERNET")
     def check_internet(self, target: str = 'http://archive.ubuntu.com/ubuntu') -> bool:
         """Check internet connectivity."""
         result = subprocess.run(
-            ['wget', '-q', '--spider', '--timeout=5', 
+            ['wget', '-q', '--spider', '--timeout=5',
              target],
             capture_output=True,
             timeout=10
         )
         return result.returncode == 0
-    
+
     @log_operation_errors("CHECK_DISK_SPACE")
     def check_disk_space(self, path: str = "/", min_gb: float = 5.0) -> bool:
         """Check if sufficient disk space is available."""
@@ -51,9 +51,9 @@ class SystemOperations:
         """Update /etc/hosts to resolve new hostname to 127.0.1.1."""
         try:
              # Read current hosts file
-            with open('/etc/hosts', 'r') as f:
+            with open('/etc/hosts') as f:
                 lines = f.readlines()
-            
+
             new_lines = []
             found = False
             for line in lines:
@@ -62,37 +62,37 @@ class SystemOperations:
                     found = True
                 else:
                     new_lines.append(line)
-            
+
             if not found:
                 new_lines.append(f"127.0.1.1\t{new_hostname}\n")
-            
+
             # Write temporary file
             with tempfile.NamedTemporaryFile(mode='w', delete=False) as tf:
                 tf.writelines(new_lines)
                 temp_path = tf.name
-            
+
             # Move into place using sudo
             result = self.sudo.run_command(
                 ['cp', temp_path, '/etc/hosts'],
                 timeout=5
             )
             os.unlink(temp_path)
-            
+
             return result.returncode == 0
         except Exception as e:
             self.logger.log_error(e, "UPDATE_HOSTS_FILE")
             return False
-    
+
     def get_hostname(self) -> str:
         """Get current hostname."""
         return socket.gethostname()
-    
+
     @log_operation_errors("SET_HOSTNAME")
     def set_hostname(self, new_hostname: str) -> bool:
         """Set system hostname."""
         # Validate hostname before setting
         from digital_signage_toolkit.utils.validators import sanitize_hostname
-        
+
         sanitized = sanitize_hostname(new_hostname)
         if not sanitized:
             self.logger.log_error(
@@ -100,7 +100,7 @@ class SystemOperations:
                 "SET_HOSTNAME"
             )
             return False
-        
+
         result = self.sudo.run_command(
             ['hostnamectl', 'set-hostname', sanitized],
             timeout=10
@@ -111,11 +111,11 @@ class SystemOperations:
                 "SET_HOSTNAME"
             )
             return False
-            
+
         # Also update /etc/hosts
         self.update_hosts_file(sanitized)
         return True
-    
+
     @log_operation_errors_with_message("APT_UPDATE", (False, "Update failed"))
     def apt_update(self) -> Tuple[bool, str]:
         """Run apt-get update."""
@@ -140,7 +140,7 @@ class SystemOperations:
         except Exception as e:
             self.logger.log_error(e, "APT_UPDATE")
             return False, str(e)
-    
+
     @log_operation_errors_with_message("APT_UPGRADE", (False, "Upgrade failed"))
     def apt_upgrade(self) -> Tuple[bool, str]:
         """Run apt-get upgrade."""
@@ -165,7 +165,7 @@ class SystemOperations:
         except Exception as e:
             self.logger.log_error(e, "APT_UPGRADE")
             return False, str(e)
-    
+
     @log_operation_errors_with_message("APT_DIST_UPGRADE", (False, "Dist-upgrade failed"))
     def apt_dist_upgrade(self) -> Tuple[bool, str]:
         """Run apt-get dist-upgrade."""
@@ -190,7 +190,7 @@ class SystemOperations:
         except Exception as e:
             self.logger.log_error(e, "APT_DIST_UPGRADE")
             return False, str(e)
-    
+
     @log_operation_errors_with_message("APT_AUTOREMOVE", (False, "Autoremove failed"))
     def apt_autoremove(self) -> Tuple[bool, str]:
         """Run apt-get autoremove."""
@@ -205,7 +205,7 @@ class SystemOperations:
                 "APT_AUTOREMOVE"
             )
         return result.returncode == 0, result.stdout + result.stderr
-    
+
     @log_operation_errors_with_message("INSTALL_PACKAGES", (False, "Package installation failed"))
     def install_packages(self, packages: list[str]) -> Tuple[bool, str]:
         """Install packages via apt."""
@@ -220,7 +220,7 @@ class SystemOperations:
                 "INSTALL_PACKAGES"
             )
         return result.returncode == 0, result.stdout + result.stderr
-    
+
     @log_operation_errors_with_message("REMOVE_PACKAGES", (False, "Package removal failed"))
     def remove_packages(self, packages: list[str]) -> Tuple[bool, str]:
         """Remove packages via apt."""
@@ -235,7 +235,7 @@ class SystemOperations:
                 "REMOVE_PACKAGES"
             )
         return result.returncode == 0, result.stdout + result.stderr
-    
+
     @log_operation_errors("CONFIGURE_APT_AUTO_UPGRADES")
     def configure_apt_auto_upgrades(self) -> bool:
         """Configure automatic apt upgrades."""
@@ -251,7 +251,7 @@ APT::Periodic::AutocleanInterval "7";
             with tempfile.NamedTemporaryFile(mode='w', delete=False, suffix='.conf') as f:
                 f.write(config_content)
                 temp_path = f.name
-            
+
             result = self.sudo.run_command(
                 ['cp', temp_path, '/etc/apt/apt.conf.d/20auto-upgrades'],
                 timeout=10
@@ -268,19 +268,19 @@ APT::Periodic::AutocleanInterval "7";
                     os.unlink(temp_path)
                 except Exception as e:
                     self.logger.log_error(e, "CLEANUP_TEMP_FILE")
-    
+
     @log_operation_errors("DISABLE_WAYLAND")
     def disable_wayland(self) -> bool:
         """Disable Wayland in GDM (GDM3 only, Ubuntu 18.04+)."""
         # Check if GDM3 exists (Ubuntu 18.04+)
         gdm3_conf = Path('/etc/gdm3/custom.conf')
         gdm_conf = Path('/etc/gdm/custom.conf')  # Older GDM
-        
+
         # Try GDM3 first (Ubuntu 18.04+)
         if gdm3_conf.exists():
             # Backup custom.conf if it exists
             backup_result = self.sudo.run_command(
-                ['cp', '/etc/gdm3/custom.conf', '/etc/gdm3/custom.conf.backup'], 
+                ['cp', '/etc/gdm3/custom.conf', '/etc/gdm3/custom.conf.backup'],
                 timeout=10
             )
             if backup_result.returncode != 0:
@@ -288,7 +288,7 @@ APT::Periodic::AutocleanInterval "7";
                     RuntimeError(f"Failed to backup GDM config: {backup_result.stderr}"),
                     "DISABLE_WAYLAND"
                 )
-            
+
             # Modify custom.conf
             result = self.sudo.run_command(
                 ['sed', '-i', 's/^#WaylandEnable=false/WaylandEnable=false/', '/etc/gdm3/custom.conf'],
@@ -317,7 +317,7 @@ APT::Periodic::AutocleanInterval "7";
                 "DISABLE_WAYLAND"
             )
             return False
-    
+
     @log_operation_errors("CONFIGURE_TIMEDATECTL")
     def configure_timedatectl(self) -> bool:
         """Enable NTP synchronization."""
@@ -328,7 +328,7 @@ APT::Periodic::AutocleanInterval "7";
                 "CONFIGURE_TIMEDATECTL"
             )
         return result.returncode == 0
-    
+
     @log_operation_errors("CONFIGURE_DISPLAY_POWER")
     def configure_display_power(self) -> bool:
         """Disable screen saver and power management."""
@@ -347,13 +347,13 @@ APT::Periodic::AutocleanInterval "7";
                 "CONFIGURE_DISPLAY_POWER"
             )
         return result.returncode == 0
-    
+
     @log_operation_errors("GET_DISPLAY_RESOLUTION", None)
     def get_display_resolution(self) -> Optional[str]:
         """Get current display resolution. Supports both X11 and Wayland."""
         # Detect display server
         display_server = os.environ.get('XDG_SESSION_TYPE', '').lower()
-        
+
         if display_server == 'wayland':
             # Try to get resolution via wayland-query or wlr-randr
             try:
@@ -412,15 +412,33 @@ APT::Periodic::AutocleanInterval "7";
                     "GET_DISPLAY_RESOLUTION"
                 )
         return None
-    
+
     @log_operation_errors("GET_AVAILABLE_RESOLUTIONS", ["1920x1080", "1280x720", "1366x768", "1600x900", "2560x1440", "3840x2160"])
     def get_available_resolutions(self) -> list[str]:
         """Get list of available display resolutions for the primary display."""
         display_server = os.environ.get('XDG_SESSION_TYPE', '').lower()
-        
+
         if display_server == 'wayland':
-            # Wayland doesn't easily expose available modes
-            # Return common resolutions as fallback
+            # Wayland resolution detection using wlr-randr
+            try:
+                result = subprocess.run(
+                    ['wlr-randr'], capture_output=True, text=True, timeout=5
+                )
+                if result.returncode == 0:
+                    import re
+                    resolutions = set()
+                    resolution_pattern = re.compile(r'\b(\d+x\d+)\b')
+                    for line in result.stdout.split('\n'):
+                        if line.strip().startswith((' ', '\t')):
+                            matches = resolution_pattern.findall(line)
+                            for match in matches:
+                                from digital_signage_toolkit.utils.validators import validate_resolution
+                                if validate_resolution(match):
+                                    resolutions.add(match)
+                    if resolutions:
+                        return sorted(list(resolutions), key=lambda x: int(x.split('x')[0]) * int(x.split('x')[1]), reverse=True)
+            except FileNotFoundError:
+                pass
             return ["1920x1080", "1280x720", "1366x768", "1600x900", "2560x1440", "3840x2160"]
         else:
             # X11 - use xrandr with regex for single-pass parsing (performance improvement)
@@ -437,10 +455,10 @@ APT::Periodic::AutocleanInterval "7";
                 import re
                 resolutions = set()  # Use set to avoid duplicates
                 current_output = None
-                
+
                 # Use regex for more efficient parsing
                 resolution_pattern = re.compile(r'\b(\d+x\d+)\b')
-                
+
                 for line in result.stdout.split('\n'):
                     # Find connected output
                     if 'connected' in line and 'disconnected' not in line:
@@ -448,7 +466,7 @@ APT::Periodic::AutocleanInterval "7";
                         if parts:
                             current_output = parts[0]
                         continue
-                    
+
                     # Parse mode lines - look for resolution patterns
                     if current_output and line.strip().startswith((' ', '\t')):
                         # Extract all resolution patterns from line
@@ -461,7 +479,7 @@ APT::Periodic::AutocleanInterval "7";
                     elif line.strip() and not line.strip().startswith((' ', '\t')):
                         # New output section, reset
                         current_output = None
-                
+
                 # Sort resolutions by width*height (largest first)
                 if resolutions:
                     sorted_resolutions = sorted(
@@ -470,7 +488,7 @@ APT::Periodic::AutocleanInterval "7";
                         reverse=True
                     )
                     return sorted_resolutions
-                
+
                 # Fallback to common resolutions if parsing failed
                 return ["1920x1080", "1280x720", "1366x768", "1600x900", "2560x1440", "3840x2160"]
             elif result.returncode != 0:
@@ -479,29 +497,59 @@ APT::Periodic::AutocleanInterval "7";
                     RuntimeError(f"xrandr failed: {error_msg}"),
                     "GET_AVAILABLE_RESOLUTIONS"
                 )
-        
+
         # Fallback to common resolutions
         return ["1920x1080", "1280x720", "1366x768", "1600x900", "2560x1440", "3840x2160"]
-    
+
     @log_operation_errors("SET_DISPLAY_RESOLUTION")
     def set_display_resolution(self, resolution: Optional[str] = None, output_name: Optional[str] = None) -> bool:
         """Set display resolution. If resolution is None, uses native/current resolution. Supports X11 with multi-monitor."""
         # Detect display server
         display_server = os.environ.get('XDG_SESSION_TYPE', '').lower()
-        
+
         if display_server == 'wayland':
-            # Wayland resolution setting is complex and requires compositor-specific tools
-            # For now, return True (resolution is already set by system)
-            self.logger.log_error(
-                NotImplementedError("Wayland resolution setting not fully implemented"),
-                "SET_DISPLAY_RESOLUTION"
-            )
-            return True
+            try:
+                # Find connected outputs
+                result = subprocess.run(['wlr-randr'], capture_output=True, text=True, timeout=5)
+                if result.returncode != 0:
+                    self.logger.log_error(RuntimeError("wlr-randr failed"), "SET_DISPLAY_RESOLUTION")
+                    return False
+
+                connected_outputs = []
+                for line in result.stdout.split('\n'):
+                    if line and not line.startswith((' ', '\t')):
+                        parts = line.split()
+                        if parts:
+                            connected_outputs.append(parts[0])
+
+                if not connected_outputs:
+                    return False
+
+                target_output = output_name if output_name and output_name in connected_outputs else connected_outputs[0]
+
+                if resolution is None:
+                    current_res = self.get_display_resolution()
+                    if current_res:
+                        return True
+                    return False
+
+                from digital_signage_toolkit.utils.validators import validate_resolution
+                if not validate_resolution(resolution):
+                    return False
+
+                result = subprocess.run(
+                    ['wlr-randr', '--output', target_output, '--mode', resolution],
+                    capture_output=True, timeout=5
+                )
+                return result.returncode == 0
+            except FileNotFoundError:
+                self.logger.log_error(RuntimeError("wlr-randr not found"), "SET_DISPLAY_RESOLUTION")
+                return False
         else:
             # X11 - use xrandr
             env = os.environ.copy()
             env['DISPLAY'] = ':0'
-            
+
             # Get available modes and outputs
             result = subprocess.run(
                 ['xrandr'],
@@ -517,7 +565,7 @@ APT::Periodic::AutocleanInterval "7";
                     "SET_DISPLAY_RESOLUTION"
                 )
                 return False
-            
+
             # Find connected outputs
             connected_outputs = []
             for line in result.stdout.split('\n'):
@@ -525,17 +573,17 @@ APT::Periodic::AutocleanInterval "7";
                     parts = line.split()
                     if parts:
                         connected_outputs.append(parts[0])
-            
+
             if not connected_outputs:
                 self.logger.log_error(
                     RuntimeError("No connected displays found"),
                     "SET_DISPLAY_RESOLUTION"
                 )
                 return False
-            
+
             # Use specified output or first connected output
             target_output = output_name if output_name and output_name in connected_outputs else connected_outputs[0]
-            
+
             # If no resolution specified, detect and use current/native resolution
             if resolution is None:
                 current_res = self.get_display_resolution()
@@ -549,7 +597,7 @@ APT::Periodic::AutocleanInterval "7";
                         "SET_DISPLAY_RESOLUTION"
                     )
                     return False
-            
+
             # Validate resolution format if provided
             from digital_signage_toolkit.utils.validators import validate_resolution
             if not validate_resolution(resolution):
@@ -558,7 +606,7 @@ APT::Periodic::AutocleanInterval "7";
                     "SET_DISPLAY_RESOLUTION"
                 )
                 return False
-            
+
             # Set resolution (safe - resolution already validated)
             result = subprocess.run(
                 ['xrandr', '--output', target_output, '--mode', resolution],
@@ -655,7 +703,7 @@ APT::Periodic::AutocleanInterval "7";
             return True
 
         return self.set_display_resolution(preferred)
-    
+
     def reboot(self, clear_cache: bool = True) -> bool:
         """Reboot the system. Optionally clear cache before reboot."""
         try:
@@ -663,27 +711,27 @@ APT::Periodic::AutocleanInterval "7";
             if clear_cache:
                 from digital_signage_toolkit.core.software_installer import SoftwareInstaller
                 from digital_signage_toolkit.utils.config import Config
-                
+
                 try:
                     installer = SoftwareInstaller(self.sudo, Config())
                     installer.clear_rise_cache(aggressive=True, log_callback=None)
                 except Exception:
                     # Cache clearing failed, but continue with reboot
                     pass
-            
+
             # Reboot system
             self.sudo.run_command(['reboot'], timeout=5)
             return True
         except Exception:
             return False
-    
+
     @log_operation_errors("BACKUP_SOURCES_LIST", None)
     def backup_sources_list(self, timestamp: Optional[str] = None) -> Optional[str]:
         """Backup /etc/apt/sources.list."""
         if timestamp is None:
             from datetime import datetime
             timestamp = datetime.now().strftime('%Y-%m-%d_%H%M')
-        
+
         backup_path = f"/etc/apt/sources.list.backup.{timestamp}"
         result = self.sudo.run_command(
             ['cp', '/etc/apt/sources.list', backup_path],
@@ -697,7 +745,7 @@ APT::Periodic::AutocleanInterval "7";
                 "BACKUP_SOURCES_LIST"
             )
         return None
-    
+
     @log_operation_errors("RESTORE_SOURCES_LIST")
     def restore_sources_list(self, backup_path: str) -> bool:
         """Restore /etc/apt/sources.list from backup."""
@@ -709,7 +757,7 @@ APT::Periodic::AutocleanInterval "7";
                 "RESTORE_SOURCES_LIST"
             )
             return False
-        
+
         result = self.sudo.run_command(
             ['cp', backup_path, '/etc/apt/sources.list'],
             timeout=10
@@ -720,7 +768,7 @@ APT::Periodic::AutocleanInterval "7";
                 "RESTORE_SOURCES_LIST"
             )
         return result.returncode == 0
-    
+
     @log_operation_errors("GET_SOURCES_BACKUPS", [])
     def get_sources_backups(self) -> list[str]:
         """Get list of sources.list backup files."""
@@ -731,14 +779,14 @@ APT::Periodic::AutocleanInterval "7";
         if result.returncode == 0:
             return result.stdout.strip().split('\n') if result.stdout.strip() else []
         return []
-    
+
     @log_operation_errors("FIX_APT_LOCKS")
     def fix_apt_locks(self) -> bool:
         """Remove apt locks and fix dpkg."""
         # Kill apt processes (ignore errors if processes don't exist)
-        kill_result = self.sudo.run_command(['killall', 'apt', 'apt-get', 'dpkg'], timeout=5)
+        self.sudo.run_command(['killall', 'apt', 'apt-get', 'dpkg'], timeout=5)
         # killall returns non-zero if no processes found, which is OK
-        
+
         # Remove locks
         rm_result = self.sudo.run_command(['rm', '-f', '/var/lib/apt/lists/lock'], timeout=5)
         if rm_result.returncode != 0:
@@ -746,7 +794,7 @@ APT::Periodic::AutocleanInterval "7";
                 RuntimeError(f"Failed to remove apt lock: {rm_result.stderr}"),
                 "FIX_APT_LOCKS"
             )
-        
+
         # Configure dpkg
         result = self.sudo.run_command(['dpkg', '--configure', '-a'], timeout=300)
         if result.returncode != 0:
@@ -755,12 +803,12 @@ APT::Periodic::AutocleanInterval "7";
                 "FIX_APT_LOCKS"
             )
         return result.returncode == 0
-    
+
     @log_operation_errors("FORCE_MAIN_MIRROR")
     def force_main_mirror(self) -> bool:
         """Force apt to use main Ubuntu mirror."""
         result = self.sudo.run_command(
-            ['sed', '-i', 's|https\\?://[^/ ]*/ubuntu|http://archive.ubuntu.com/ubuntu|g', 
+            ['sed', '-i', 's|https\\?://[^/ ]*/ubuntu|http://archive.ubuntu.com/ubuntu|g',
              '/etc/apt/sources.list'],
             timeout=10
         )
@@ -770,7 +818,7 @@ APT::Periodic::AutocleanInterval "7";
                 "FORCE_MAIN_MIRROR"
             )
         return result.returncode == 0
-    
+
     @log_operation_errors("RESTART_NETWORKING")
     def restart_networking(self) -> bool:
         """Restart networking services."""
@@ -778,7 +826,7 @@ APT::Periodic::AutocleanInterval "7";
         result = self.sudo.run_command(['netplan', 'apply'], timeout=30)
         if result.returncode == 0:
             return True
-            
+
         # Fallback to NetworkManager
         result = self.sudo.run_command(['systemctl', 'restart', 'NetworkManager'], timeout=30)
         return result.returncode == 0
@@ -804,7 +852,7 @@ APT::Periodic::AutocleanInterval "7";
             self.install_packages(['scrot'])
 
         env = os.environ.copy()
-        
+
         # 1. Try to piggyback off existing X session
         # Find who is logged in on a display
         display = ":0" # Default
@@ -821,13 +869,13 @@ APT::Periodic::AutocleanInterval "7";
                              break
         except:
              pass
-             
+
         env['DISPLAY'] = display
         env['XAUTHORITY'] = f"/home/{os.environ.get('SUDO_USER', 'rise')}/.Xauthority"
-        
+
         # Ensure directory exists
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)
-        
+
         result = subprocess.run(
             ['scrot', '--overwrite', output_path],
             env=env,
@@ -850,14 +898,14 @@ APT::Periodic::AutocleanInterval "7";
             "renderer_count": 0,
             "memory_usage_mb": 0.0
         }
-        
+
         # Check Service
         svc_result = subprocess.run(
             ['systemctl', 'is-active', 'rise-vision-player'],
             capture_output=True, text=True
         )
         status["service_active"] = (svc_result.returncode == 0)
-        
+
         # Check Renderer (Chrome/Chromium)
         # Rise Player usually spawns 'chrome' or 'chromium' processes
         try:
@@ -870,7 +918,7 @@ APT::Periodic::AutocleanInterval "7";
                 lines = pgrep.stdout.strip().split('\n')
                 status["renderer_count"] = len(lines)
                 status["renderer_running"] = status["renderer_count"] > 0
-                
+
                 # Get memory usage (RSS)
                 ps = subprocess.run(
                     ['ps', '-o', 'rss=', '-p', ','.join([line.split()[0] for line in lines])],
@@ -879,31 +927,31 @@ APT::Periodic::AutocleanInterval "7";
                 if ps.returncode == 0:
                     total_kb = sum(int(x) for x in ps.stdout.split() if x.strip().isdigit())
                     status["memory_usage_mb"] = total_kb / 1024
-                    
+
         except Exception as e:
             self.logger.log_error(e, "GET_RISE_STATUS_PROCESS")
-            
+
         return status
 
     def get_uptime(self) -> str:
         """Get system uptime in human-readable format."""
         try:
-            with open('/proc/uptime', 'r') as f:
+            with open('/proc/uptime') as f:
                 uptime_seconds = float(f.readline().split()[0])
-            
+
             days = int(uptime_seconds // (24 * 3600))
             uptime_seconds %= (24 * 3600)
             hours = int(uptime_seconds // 3600)
             uptime_seconds %= 3600
             minutes = int(uptime_seconds // 60)
-            
+
             parts = []
             if days > 0:
                 parts.append(f"{days}d")
             if hours > 0:
                 parts.append(f"{hours}h")
             parts.append(f"{minutes}m")
-            
+
             return " ".join(parts)
         except Exception:
             return "Unknown"
@@ -912,24 +960,21 @@ APT::Periodic::AutocleanInterval "7";
     def get_active_interface(self) -> Dict[str, str]:
         """Get active network interface and IP."""
         try:
-            # Get default route interface
-            result = subprocess.run(
-                "ip route | grep default | awk '{print $5}'", 
-                shell=True, capture_output=True, text=True
-            )
-            interface = result.stdout.strip()
-            
-            if not interface:
-                return {"interface": "None", "ip": "Unknown"}
-            
-            # Get IP for that interface
-            result_ip = subprocess.run(
-                f"ip -4 addr show {interface} | grep -oP '(?<=inet\\s)\\d+(\\.\\d+){{3}}'",
-                shell=True, capture_output=True, text=True
-            )
-            ip = result_ip.stdout.strip()
-            
-            return {"interface": interface, "ip": ip}
+            import socket
+
+            import psutil
+            stats = psutil.net_if_stats()
+            addrs = psutil.net_if_addrs()
+
+            for interface, stat in stats.items():
+                if interface == 'lo':
+                    continue
+                if stat.isup:
+                    if interface in addrs:
+                        for addr in addrs[interface]:
+                            if addr.family == socket.AF_INET:
+                                return {"interface": interface, "ip": addr.address}
+            return {"interface": "None", "ip": "Unknown"}
         except Exception:
             return {"interface": "Unknown", "ip": "Unknown"}
 
@@ -957,7 +1002,7 @@ APT::Periodic::AutocleanInterval "7";
         """Start or Stop rise-vision-player service."""
         if action not in ['start', 'stop', 'restart']:
             return False
-            
+
         result = self.sudo.run_command(
             ['systemctl', action, 'rise-vision-player'],
             timeout=30

@@ -1,17 +1,18 @@
 """Hardware health monitoring module."""
-import psutil
 import subprocess
 from pathlib import Path
 from typing import Dict, Optional
+
+import psutil
 from digital_signage_toolkit.utils.logger import get_logger
 
 
 class HardwareMonitor:
     """Monitors hardware health metrics."""
-    
+
     def __init__(self):
         self.logger = get_logger()
-    
+
     @staticmethod
     def get_cpu_temperature() -> Optional[float]:
         """Get CPU temperature in Celsius."""
@@ -36,19 +37,19 @@ class HardwareMonitor:
                                     return float(temp_str)
                                 except ValueError:
                                     continue
-            
+
             # Method 2: thermal_zone files
             try:
-                with open('/sys/class/thermal/thermal_zone0/temp', 'r') as f:
+                with open('/sys/class/thermal/thermal_zone0/temp') as f:
                     temp_millidegrees = int(f.read().strip())
                     return temp_millidegrees / 1000.0
             except Exception:
                 pass
-            
+
             return None
         except Exception:
             return None
-    
+
     @staticmethod
     def check_thermal_critical(threshold: float = 85.0) -> tuple[bool, Optional[float], Optional[str]]:
         """Check if any thermal zone exceeds critical threshold.
@@ -61,7 +62,7 @@ class HardwareMonitor:
         """
         max_temp = 0.0
         max_zone = None
-        
+
         try:
             # Method 1: psutil.sensors_temperatures() (if available)
             try:
@@ -75,14 +76,14 @@ class HardwareMonitor:
             except (AttributeError, NotImplementedError, Exception):
                 # psutil.sensors_temperatures() not available or failed
                 pass
-            
+
             # Method 2: Fallback to existing get_cpu_temperature() method
             if max_temp == 0.0:
                 cpu_temp = HardwareMonitor.get_cpu_temperature()
                 if cpu_temp:
                     max_temp = cpu_temp
                     max_zone = "CPU/thermal_zone0"
-            
+
             # Method 3: Check all thermal zones directly
             if max_temp == 0.0:
                 try:
@@ -92,7 +93,7 @@ class HardwareMonitor:
                             temp_file = thermal_zone / 'temp'
                             if temp_file.exists():
                                 try:
-                                    with open(temp_file, 'r') as f:
+                                    with open(temp_file) as f:
                                         temp_millidegrees = int(f.read().strip())
                                         temp_celsius = temp_millidegrees / 1000.0
                                         if temp_celsius > max_temp:
@@ -102,14 +103,14 @@ class HardwareMonitor:
                                     continue
                 except Exception:
                     pass
-            
+
             # Check if critical
             is_critical = max_temp > threshold if max_temp > 0 else False
             return (is_critical, max_temp if max_temp > 0 else None, max_zone)
-            
+
         except Exception:
             return (False, None, None)
-    
+
     @staticmethod
     def get_all_thermal_zones() -> dict[str, float]:
         """Get temperatures from all thermal zones.
@@ -118,7 +119,7 @@ class HardwareMonitor:
             Dictionary mapping zone names to temperatures in Celsius
         """
         zones = {}
-        
+
         try:
             # Try psutil first
             try:
@@ -131,7 +132,7 @@ class HardwareMonitor:
                                 zones[zone_name] = entry.current
             except (AttributeError, NotImplementedError):
                 pass
-            
+
             # Fallback: Read thermal zone files directly
             thermal_base = Path('/sys/class/thermal')
             if thermal_base.exists():
@@ -139,16 +140,16 @@ class HardwareMonitor:
                     temp_file = thermal_zone / 'temp'
                     if temp_file.exists():
                         try:
-                            with open(temp_file, 'r') as f:
+                            with open(temp_file) as f:
                                 temp_millidegrees = int(f.read().strip())
                                 zones[thermal_zone.name] = temp_millidegrees / 1000.0
                         except Exception:
                             continue
-            
+
             return zones
         except Exception:
             return {}
-    
+
     @staticmethod
     def get_disk_usage() -> Dict[str, float]:
         """Get disk usage statistics."""
@@ -162,7 +163,7 @@ class HardwareMonitor:
             }
         except Exception:
             return {'total_gb': 0, 'used_gb': 0, 'free_gb': 0, 'percent': 0}
-    
+
     @staticmethod
     def get_memory_usage() -> Dict[str, float]:
         """Get memory usage statistics."""
@@ -176,7 +177,7 @@ class HardwareMonitor:
             }
         except Exception:
             return {'total_gb': 0, 'used_gb': 0, 'available_gb': 0, 'percent': 0}
-    
+
     @staticmethod
     def get_cpu_usage() -> float:
         """Get current CPU usage percentage."""
@@ -184,7 +185,7 @@ class HardwareMonitor:
             return psutil.cpu_percent(interval=1)
         except Exception:
             return 0.0
-    
+
     @staticmethod
     def check_teamviewer_status() -> Dict[str, bool]:
         """Check TeamViewer connectivity status."""
@@ -196,7 +197,7 @@ class HardwareMonitor:
                 timeout=5
             )
             is_running = result.returncode == 0
-            
+
             # Try to get TeamViewer ID (requires teamviewer command)
             is_online = False
             try:
@@ -210,7 +211,7 @@ class HardwareMonitor:
                     is_online = True
             except Exception:
                 pass
-            
+
             return {
                 'installed': subprocess.run(['which', 'teamviewer'], capture_output=True).returncode == 0,
                 'running': is_running,
@@ -218,7 +219,7 @@ class HardwareMonitor:
             }
         except Exception:
             return {'installed': False, 'running': False, 'online': False}
-    
+
     @staticmethod
     def get_system_info() -> Dict[str, str]:
         """Get basic system information."""

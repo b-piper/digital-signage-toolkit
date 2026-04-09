@@ -1,10 +1,10 @@
 """File utilities for downloads, checksums, and verification."""
 import hashlib
+import os
 import subprocess
 import time
-import os
 from pathlib import Path
-from typing import Optional, Callable
+from typing import Callable, Optional
 from urllib.parse import urlparse
 
 
@@ -21,7 +21,7 @@ def verify_checksum(file_path: Path, expected_checksum: str) -> bool:
     """Verify file checksum matches expected value."""
     if not expected_checksum:
         return True  # No checksum provided, skip verification
-    
+
     try:
         actual_checksum = calculate_sha256(file_path)
         return actual_checksum.lower() == expected_checksum.lower()
@@ -41,10 +41,10 @@ def download_with_retry(url: str, dest_path: str,
     """Download file with retry logic, proxy support, and bandwidth limiting."""
     dest = Path(dest_path)
     dest.parent.mkdir(parents=True, exist_ok=True)
-    
+
     # Build wget command
     wget_cmd = ['wget', '--tries=1', f'--timeout={timeout}', '-O', str(dest), url]
-    
+
     # Add proxy support - use environment variables to avoid password in process args
     env = os.environ.copy()
     if proxy:
@@ -62,11 +62,11 @@ def download_with_retry(url: str, dest_path: str,
             env['HTTP_PROXY'] = proxy
             env['HTTPS_PROXY'] = proxy
         wget_cmd.extend(['--proxy=on'])
-    
+
     # Add bandwidth limiting
     if bandwidth_limit > 0:
         wget_cmd.append(f'--limit-rate={bandwidth_limit}K')
-    
+
     # Retry loop with exponential backoff
     for attempt in range(1, max_retries + 1):
         try:
@@ -75,7 +75,7 @@ def download_with_retry(url: str, dest_path: str,
                     log_callback(f"Retry attempt {attempt}/{max_retries}...")
                 else:
                     log_callback(f"Downloading from {url}...")
-            
+
             result = subprocess.run(
                 wget_cmd,
                 capture_output=True,
@@ -83,7 +83,7 @@ def download_with_retry(url: str, dest_path: str,
                 timeout=timeout * 2,  # Allow more time for slow connections
                 env=env  # Use environment with proxy credentials
             )
-            
+
             if result.returncode == 0 and dest.exists():
                 # Verify file is not truncated by checking size
                 # If Content-Length header was present, wget would have validated it
@@ -99,7 +99,7 @@ def download_with_retry(url: str, dest_path: str,
                         time.sleep(wait_time)
                         continue
                     return False
-                
+
                 if log_callback:
                     log_callback(f"Download complete: {dest} ({file_size} bytes)")
                 return True
@@ -107,7 +107,7 @@ def download_with_retry(url: str, dest_path: str,
                 error_msg = result.stderr or result.stdout or "Unknown error"
                 if log_callback:
                     log_callback(f"Download failed: {error_msg}")
-                
+
                 if attempt < max_retries:
                     wait_time = retry_delay * (2 ** (attempt - 1))  # Exponential backoff
                     if log_callback:
@@ -115,7 +115,7 @@ def download_with_retry(url: str, dest_path: str,
                     time.sleep(wait_time)
                 else:
                     return False
-                    
+
         except subprocess.TimeoutExpired:
             if log_callback:
                 log_callback(f"Download timed out (attempt {attempt}/{max_retries})")
@@ -132,6 +132,6 @@ def download_with_retry(url: str, dest_path: str,
                 time.sleep(wait_time)
             else:
                 return False
-    
+
     return False
 

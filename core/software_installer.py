@@ -1,28 +1,29 @@
 """Software installation module."""
-import subprocess
 import os
 import shutil
+import subprocess
 from pathlib import Path
-from typing import Optional, Callable
-from digital_signage_toolkit.utils.sudo_handler import SudoHandler
+from typing import Callable, Optional
+
 from digital_signage_toolkit.utils.config import Config
 from digital_signage_toolkit.utils.file_utils import download_with_retry, verify_checksum
 from digital_signage_toolkit.utils.logger import get_logger
+from digital_signage_toolkit.utils.sudo_handler import SudoHandler
 
 
 class SoftwareInstaller:
     """Handles software installation (TeamViewer, Rise Vision)."""
-    
+
     def __init__(self, sudo_handler: SudoHandler, config: Optional[Config] = None):
         self.sudo = sudo_handler
         self.config = config or Config()
         self.logger = get_logger()
-    
+
     def is_installed(self, command: str) -> bool:
         """Check if a command/package is installed."""
         return shutil.which(command) is not None
-    
-    def download_file(self, url: str, dest_path: str, 
+
+    def download_file(self, url: str, dest_path: str,
                      expected_checksum: Optional[str] = None,
                      log_callback: Optional[Callable[[str], None]] = None) -> bool:
         """Download a file from URL with retry, proxy, and checksum verification."""
@@ -35,7 +36,7 @@ class SoftwareInstaller:
         retry_delay = self.config.get('network.retry_delay', 5)
         bandwidth_limit = self.config.get('network.bandwidth_limit', 0)
         verify_checksums = self.config.get('security.verify_checksums', True)
-        
+
         # Download with retry
         try:
             success = download_with_retry(
@@ -49,7 +50,7 @@ class SoftwareInstaller:
                 bandwidth_limit=bandwidth_limit,
                 log_callback=log_callback
             )
-            
+
             if not success:
                 return False
         except Exception as e:
@@ -57,12 +58,12 @@ class SoftwareInstaller:
             if log_callback:
                 log_callback(f"Download error: {e}")
             return False
-        
+
         # Verify checksum if provided and verification is enabled
         if verify_checksums and expected_checksum:
             if log_callback:
                 log_callback("Verifying file integrity...")
-            
+
             if not verify_checksum(Path(dest_path), expected_checksum):
                 if log_callback:
                     log_callback("❌ ERROR: File checksum verification failed!")
@@ -77,13 +78,13 @@ class SoftwareInstaller:
                 except Exception:
                     pass
                 return False
-            
+
             if log_callback:
                 log_callback("✅ File integrity verified")
-        
+
         return True
-    
-    def install_deb_package(self, deb_path: str, 
+
+    def install_deb_package(self, deb_path: str,
                            log_callback: Optional[Callable[[str], None]] = None) -> bool:
         """Install a .deb package."""
         # Validate deb path
@@ -96,16 +97,16 @@ class SoftwareInstaller:
             if log_callback:
                 log_callback(f"Invalid .deb file path: {deb_path}")
             return False
-        
+
         if log_callback:
             log_callback(f"Installing {deb_path}...")
-        
+
         try:
             result = self.sudo.run_command(
                 ['apt', 'install', '-y', deb_path],
                 timeout=600
             )
-            
+
             if result.returncode == 0:
                 if log_callback:
                     log_callback("Installation successful")
@@ -124,7 +125,7 @@ class SoftwareInstaller:
                 log_callback(f"Installation error: {e}")
             self.logger.log_error(e, "INSTALL_DEB_PACKAGE")
             return False
-    
+
     def install_teamviewer(self, url: Optional[str] = None, local_path: Optional[str] = None,
                           log_callback: Optional[Callable[[str], None]] = None) -> bool:
         """Install TeamViewer."""
@@ -132,12 +133,12 @@ class SoftwareInstaller:
             if log_callback:
                 log_callback("TeamViewer is already installed")
             return True
-        
+
         # Get URL and checksum from config if not provided
         if not url:
             url = self.config.get('urls.teamviewer', '')
         expected_checksum = self.config.get('checksums.teamviewer', '')
-        
+
         # Try local file first
         if local_path and Path(local_path).exists():
             if log_callback:
@@ -149,7 +150,7 @@ class SoftwareInstaller:
                         log_callback("❌ ERROR: Local file checksum verification failed!")
                     return False
             return self.install_deb_package(local_path, log_callback)
-        
+
         # Download and install
         temp_deb = '/tmp/teamviewer.deb'
         if self.download_file(url, temp_deb, expected_checksum=expected_checksum, log_callback=log_callback):
@@ -158,30 +159,30 @@ class SoftwareInstaller:
             if Path(temp_deb).exists():
                 os.remove(temp_deb)
             return success
-        
+
         return False
-    
+
     def install_rise_vision(self, url: Optional[str] = None, local_path: Optional[str] = None,
                            startup_script_path: str = "~/rvplayer/scripts/start.sh",
                            log_callback: Optional[Callable[[str], None]] = None,
                            completion_callback: Optional[Callable[[bool], None]] = None) -> None:
         """Install Rise Vision Player (async, requires user interaction)."""
         startup_path = Path(os.path.expanduser(startup_script_path))
-        
+
         if startup_path.exists() and startup_path.stat().st_size > 0:
             if log_callback:
                 log_callback("Rise Vision is already installed")
             if completion_callback:
                 completion_callback(True)
             return
-        
+
         # Get URL and checksum from config if not provided
         if not url:
             url = self.config.get('urls.rise_vision', '')
         expected_checksum = self.config.get('checksums.rise_vision', '')
-        
+
         installer_path = None
-        
+
         # Try local file first
         if local_path and Path(local_path).exists():
             installer_path = local_path
@@ -206,14 +207,14 @@ class SoftwareInstaller:
                 if completion_callback:
                     completion_callback(False)
                 return
-        
+
         # Make executable and launch
         if installer_path:
             os.chmod(installer_path, 0o755)
             if log_callback:
                 log_callback("Launching Rise Vision installer...")
                 log_callback("⚠️  If the Player opens, CLOSE IT to continue setup.")
-            
+
             # Launch installer in background
             process = subprocess.Popen(
                 [installer_path],
@@ -221,7 +222,7 @@ class SoftwareInstaller:
                 stderr=subprocess.PIPE,
                 text=True
             )
-            
+
             # Monitor for completion
             def monitor_installer():
                 try:
@@ -232,30 +233,30 @@ class SoftwareInstaller:
                     process.kill()
                     if completion_callback:
                         completion_callback(False)
-            
+
             import threading
             threading.Thread(target=monitor_installer, daemon=True).start()
-    
+
     def fix_rise_permissions(self, player_dir: str = "~/rvplayer",
                            log_callback: Optional[Callable[[str], None]] = None) -> bool:
         """Fix Rise Vision Player permissions (chrome-sandbox)."""
         player_path = Path(os.path.expanduser(player_dir))
         sandbox = None
-        
+
         # Find chrome-sandbox
         for root, dirs, files in os.walk(player_path):
             if 'chrome-sandbox' in files:
                 sandbox = Path(root) / 'chrome-sandbox'
                 break
-        
+
         if sandbox and sandbox.exists():
             try:
                 if log_callback:
                     log_callback(f"Fixing permissions for {sandbox}")
-                
+
                 self.sudo.run_command(['chown', 'root:root', str(sandbox)], timeout=10)
                 self.sudo.run_command(['chmod', '4755', str(sandbox)], timeout=10)
-                
+
                 if log_callback:
                     log_callback("Permissions fixed")
                 return True
@@ -263,9 +264,9 @@ class SoftwareInstaller:
                 if log_callback:
                     log_callback(f"Failed to fix permissions: {e}")
                 return False
-        
+
         return True  # No sandbox found, not necessarily an error
-    
+
     def clear_rise_cache(self, log_callback: Optional[Callable[[str], None]] = None, aggressive: bool = False) -> bool:
         """Clear Rise Vision Player cache. If aggressive=True, also clears Electron/Chromium caches."""
         cache_dirs = [
@@ -273,7 +274,7 @@ class SoftwareInstaller:
             Path.home() / '.config' / 'Rise Vision Player' / 'GPUCache',
             Path.home() / '.cache' / 'Rise Vision Player',
         ]
-        
+
         # Add aggressive cache clearing locations
         if aggressive:
             cache_dirs.extend([
@@ -282,22 +283,21 @@ class SoftwareInstaller:
                 Path.home() / '.config' / 'electron' / 'Cache',
                 Path.home() / '.cache' / 'electron',
             ])
-        
+
         cleared_count = 0
         total_size_freed = 0
-        
+
         for cache_dir in cache_dirs:
             if cache_dir.exists():
                 try:
                     # Check disk space before deletion (Linux only)
-                    import shutil as shutil_module
                     try:
                         statvfs = os.statvfs(cache_dir.parent)
                         free_space = statvfs.f_bavail * statvfs.f_frsize
                     except AttributeError:
                         # Windows doesn't have statvfs, skip disk space check
                         free_space = None
-                    
+
                     # Calculate size before deletion (for logging) - use du for efficiency
                     dir_size = 0
                     try:
@@ -317,9 +317,9 @@ class SoftwareInstaller:
                             dir_size = sum(f.stat().st_size for f in cache_dir.rglob('*') if f.is_file())
                         except Exception:
                             pass
-                    
+
                     total_size_freed += dir_size
-                    
+
                     # Check if we have enough space (need at least 10% free after deletion)
                     if free_space < (dir_size * 1.1):
                         if log_callback:
@@ -329,17 +329,17 @@ class SoftwareInstaller:
                             "CLEAR_RISE_CACHE"
                         )
                         continue
-                    
+
                     # Force remove (aggressive mode kills processes if needed)
                     if aggressive:
                         # Try to kill any processes using the cache
                         try:
                             import subprocess
-                            subprocess.run(['fuser', '-k', str(cache_dir)], 
+                            subprocess.run(['fuser', '-k', str(cache_dir)],
                                          capture_output=True, timeout=5, stderr=subprocess.DEVNULL)
                         except Exception:
                             pass
-                    
+
                     # Remove directory tree with proper error handling
                     try:
                         shutil.rmtree(cache_dir, ignore_errors=False)
@@ -353,7 +353,7 @@ class SoftwareInstaller:
                             # In aggressive mode, try alternative methods
                             try:
                                 import subprocess
-                                subprocess.run(['rm', '-rf', str(cache_dir)], 
+                                subprocess.run(['rm', '-rf', str(cache_dir)],
                                              capture_output=True, timeout=30, stderr=subprocess.DEVNULL)
                             except Exception:
                                 if log_callback:
@@ -364,7 +364,7 @@ class SoftwareInstaller:
                                 log_callback(f"Failed to clear {cache_dir}: {e}")
                             self.logger.log_error(e, "CLEAR_RISE_CACHE")
                             continue
-                    
+
                     if log_callback:
                         size_mb = dir_size / (1024 * 1024)
                         log_callback(f"Cleared cache: {cache_dir} ({size_mb:.1f}MB)")
@@ -374,12 +374,12 @@ class SoftwareInstaller:
                         log_callback(f"Failed to clear {cache_dir}: {e}")
                     self.logger.log_error(e, "CLEAR_RISE_CACHE")
                     # Continue with other directories even if one fails
-        
+
         if cleared_count > 0 and log_callback:
             total_mb = total_size_freed / (1024 * 1024)
             log_callback(f"Cache cleanup complete: {cleared_count} directories, {total_mb:.1f}MB freed")
         elif cleared_count == 0 and log_callback:
             log_callback("No cache directories found")
-        
+
         return True
 

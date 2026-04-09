@@ -1,13 +1,25 @@
 """Configuration management module."""
+try:
+    import fcntl
+except ImportError:
+    class DummyFcntl:
+        LOCK_SH = 1
+        LOCK_EX = 2
+        LOCK_UN = 8
+        def flock(self, fd, op):
+            pass
+    fcntl = DummyFcntl()
 import json
 import os
 from pathlib import Path
-from typing import Dict, Any, Optional
+from typing import Any, Dict, Optional
+
+from digital_signage_toolkit.utils.secrets_manager import SecretsManager
 
 
 class Config:
     """Manages application configuration with system-wide and user-specific support."""
-    
+
     def __init__(self, config_path: Optional[str] = None):
         """
         Initialize configuration.
@@ -18,9 +30,10 @@ class Config:
         3. System config: /etc/digital-signage-toolkit/config.json
         4. Default config (if none exist)
         """
+        self.secrets = SecretsManager()
         self.system_config_path = Path("/etc/digital-signage-toolkit/config.json")
         self.user_config_path = Path.home() / ".config" / "digital-signage-toolkit" / "config.json"
-        
+
         # Priority: explicit config_path > DST_CONFIG_PATH env var > default paths
         if config_path:
             self.config_path = Path(config_path)
@@ -28,20 +41,22 @@ class Config:
             self.config_path = Path(os.environ.get('DST_CONFIG_PATH'))
         else:
             self.config_path = self.user_config_path
-        
+
         self._config: Dict[str, Any] = {}
         self.load()
-    
+
     def load(self) -> None:
         """Load configuration from JSON file with fallback hierarchy."""
         # If custom config_path provided, try it first and ONLY it (for testing isolation)
         custom_path_provided = hasattr(self, 'config_path') and self.config_path != self.user_config_path
-        
+
         if custom_path_provided:
             if self.config_path.exists():
                 try:
-                    with open(self.config_path, 'r') as f:
+                    with open(self.config_path) as f:
+                        fcntl.flock(f.fileno(), fcntl.LOCK_SH)
                         loaded_config = json.load(f)
+                        fcntl.flock(f.fileno(), fcntl.LOCK_UN)
                         # Only use loaded config if it's not empty
                         if loaded_config:
                             self._config = loaded_config
@@ -52,34 +67,38 @@ class Config:
             # Custom path doesn't exist or is invalid - use defaults directly (don't check user/system)
             self._config = self._default_config()
             return
-        
+
         # Try user config first
         if self.user_config_path.exists():
             try:
-                with open(self.user_config_path, 'r') as f:
+                with open(self.user_config_path) as f:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_SH)
                     loaded_config = json.load(f)
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
                     # Only use loaded config if it's not empty
                     if loaded_config:
                         self._config = loaded_config
                         return
             except Exception:
                 pass
-        
+
         # Try system config
         if self.system_config_path.exists():
             try:
-                with open(self.system_config_path, 'r') as f:
+                with open(self.system_config_path) as f:
+                    fcntl.flock(f.fileno(), fcntl.LOCK_SH)
                     loaded_config = json.load(f)
+                    fcntl.flock(f.fileno(), fcntl.LOCK_UN)
                     # Only use loaded config if it's not empty
                     if loaded_config:
                         self._config = loaded_config
                         return
             except Exception:
                 pass
-        
+
         # Use default config (fallback when no valid config files exist)
         self._config = self._default_config()
-        
+
         # Save to user config if it doesn't exist (unless custom path was provided)
         # When custom path is provided, don't auto-save to user config
         if not custom_path_provided and not self.user_config_path.exists():
@@ -93,20 +112,23 @@ class Config:
                 pass  # Don't fail if save doesn't work
             finally:
                 self.config_path = original_path
-    
+
     def save(self) -> None:
         """Save configuration to JSON file."""
         # Create parent directories if they don't exist
         self.config_path.parent.mkdir(parents=True, exist_ok=True)
         with open(self.config_path, 'w') as f:
+            fcntl.flock(f.fileno(), fcntl.LOCK_EX)
             json.dump(self._config, f, indent=2)
-        
+            f.flush()
+            fcntl.flock(f.fileno(), fcntl.LOCK_UN)
+
         # Enforce strict permissions (Owner Read/Write only)
         try:
             os.chmod(self.config_path, 0o600)
         except Exception:
             pass  # Fallback if chmod fails on some filesystems
-    
+
     def _default_config(self) -> Dict[str, Any]:
         """Return default configuration."""
         return {
@@ -122,7 +144,6 @@ class Config:
             "network": {
                 "proxy": "",
                 "proxy_user": "",
-                "proxy_pass": "",
                 "timeout": 30,
                 "retry_attempts": 3,
                 "retry_delay": 5,
@@ -173,9 +194,12 @@ class Config:
                 "snapshot_location": "/timeshift"
             }
         }
-    
+
     def get(self, key_path: str, default: Any = None) -> Any:
         """Get configuration value using dot notation (e.g., 'urls.teamviewer')."""
+        if key_path in ['network.proxy_pass', 'security.api_token']:
+            return self.secrets.get_secret(key_path, default)
+            
         keys = key_path.split('.')
         value = self._config
         for key in keys:
@@ -184,9 +208,13 @@ class Config:
             else:
                 return default
         return value
-    
+
     def set(self, key_path: str, value: Any) -> None:
         """Set configuration value using dot notation."""
+        if key_path in ['network.proxy_pass', 'security.api_token']:
+            self.secrets.set_secret(key_path, value)
+            return
+
         keys = key_path.split('.')
         config = self._config
         for key in keys[:-1]:
@@ -194,7 +222,7 @@ class Config:
                 config[key] = {}
             config = config[key]
         config[keys[-1]] = value
-    
+
     def expand_path(self, path_key: str) -> str:
         """Expand a path from config with ~ and environment variables."""
         path = self.get(path_key, "")

@@ -10,9 +10,9 @@ from __future__ import annotations
 
 import shutil
 import subprocess
-import psutil
-from typing import Dict, Any, List, Tuple, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
+import psutil
 from digital_signage_toolkit.utils.logger import get_logger
 
 

@@ -75,36 +75,47 @@ if [ -d "/opt/dst-toolkit" ]; then
 fi
 
 # Download and run installer
-INSTALL_SCRIPT=$(mktemp)
-if curl -sSL --connect-timeout 10 --max-time 60 \
-    "https://raw.githubusercontent.com/${REPO}/main/install-remote.sh" \
-    -o "$INSTALL_SCRIPT" 2>/dev/null; then
+DEB_FILE=$(mktemp --suffix=.deb)
+DEB_URL=$(curl -sSL "https://api.github.com/repos/${REPO}/releases/latest" 2>/dev/null | grep "browser_download_url" | grep "\.deb" | head -1 | cut -d '"' -f 4)
+
+if [ -n "$DEB_URL" ] && curl -sSL --connect-timeout 10 --max-time 300 "$DEB_URL" -o "$DEB_FILE" 2>/dev/null; then
     
-    chmod +x "$INSTALL_SCRIPT"
-    
-    if bash "$INSTALL_SCRIPT" >> "$LOG_FILE" 2>&1; then
-        echo "$LATEST" > "$VERSION_FILE"
-        log "SUCCESS: Updated to v$LATEST"
-        
-        # Clean up old backups (keep last 3)
-        ls -dt /opt/dst-toolkit-backup-* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null || true
-        
-        # Optional: Restart the toolkit if running
-        # systemctl restart dst-toolkit 2>/dev/null || true
+    # Verify the downloaded file is a valid deb archive
+    if dpkg-deb -I "$DEB_FILE" >/dev/null 2>&1; then
+        if apt-get install -y "$DEB_FILE" >> "$LOG_FILE" 2>&1; then
+            echo "$LATEST" > "$VERSION_FILE"
+            log "SUCCESS: Updated to v$LATEST"
+            
+            # Clean up old backups (keep last 3)
+            ls -dt /opt/dst-toolkit-backup-* 2>/dev/null | tail -n +4 | xargs rm -rf 2>/dev/null || true
+            
+            # Optional: Restart the toolkit if running
+            # systemctl restart dst-toolkit 2>/dev/null || true
+        else
+            log "ERROR: Update failed during package installation, restoring backup"
+            if [ -d "$BACKUP_DIR" ]; then
+                rm -rf /opt/dst-toolkit
+                mv "$BACKUP_DIR" /opt/dst-toolkit
+                log "INFO: Backup restored"
+            fi
+            rm -f "$DEB_FILE"
+            exit 1
+        fi
     else
-        log "ERROR: Update failed, restoring backup"
+        log "ERROR: Downloaded file is not a valid Debian package"
         if [ -d "$BACKUP_DIR" ]; then
             rm -rf /opt/dst-toolkit
             mv "$BACKUP_DIR" /opt/dst-toolkit
             log "INFO: Backup restored"
         fi
-        rm -f "$INSTALL_SCRIPT"
+        rm -f "$DEB_FILE"
         exit 1
     fi
     
-    rm -f "$INSTALL_SCRIPT"
+    rm -f "$DEB_FILE"
 else
-    log "ERROR: Failed to download installer script"
+    log "ERROR: Failed to download standard release .deb package"
+    rm -f "$DEB_FILE"
     exit 1
 fi
 

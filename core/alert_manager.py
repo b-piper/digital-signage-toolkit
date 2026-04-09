@@ -1,24 +1,26 @@
 """Alert Manager for Digital Signage Toolkit."""
-import smtplib
-import ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-from datetime import datetime
+import base64
 import json
 import os
-import base64
+import smtplib
+import ssl
+from datetime import datetime
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+
 from digital_signage_toolkit.utils.logger import get_logger
+
 
 class AlertManager:
     """Handles sending email alerts and managing cool-down periods."""
-    
+
     def __init__(self, config_manager=None):
         self.logger = get_logger()
         self.config = config_manager
-        
+
         # State file for cool-down tracking
         self.state_file = os.path.expanduser("~/.config/digital_signage_toolkit/alert_state.json")
-        
+
     def _get_config(self):
         """Retrieve SMTP settings from config."""
         # In a real impl, this would come from a secure store or the main config class
@@ -31,7 +33,7 @@ class AlertManager:
         if not os.path.exists(self.state_file):
             return {}
         try:
-            with open(self.state_file, 'r') as f:
+            with open(self.state_file) as f:
                 return json.load(f)
         except:
             return {}
@@ -57,7 +59,7 @@ class AlertManager:
         if env_password:
             self.logger.log_operation("CREDENTIAL_SOURCE", "system", "Using environment variable")
             return env_password
-        
+
         # Priority 2: OS Keyring (optional dependency)
         try:
             import keyring
@@ -71,7 +73,7 @@ class AlertManager:
         except Exception as e:
             # Keyring access failed, log and continue
             self.logger.log_error(e, "KEYRING_ACCESS")
-        
+
         # Priority 3: Base64-encoded config (backward compatible)
         encoded_pass = conf.get("password", "")
         if encoded_pass:
@@ -82,7 +84,7 @@ class AlertManager:
             except Exception:
                 # Not valid base64, return as plain text
                 return encoded_pass
-        
+
         return ""
 
 
@@ -107,7 +109,7 @@ class AlertManager:
         state = self._load_state()
         last_sent = state.get("last_sent", 0)
         now_ts = datetime.now().timestamp()
-        
+
         if (now_ts - last_sent) < (cooldown_minutes * 60):
             self.logger.log_operation("ALERT_SUPPRESSED", "system", "In cooldown period")
             return False
@@ -117,34 +119,34 @@ class AlertManager:
             smtp_port = int(conf.get("port", 587))
             sender_email = conf.get("from_addr")
             receiver_email = conf.get("to_addr")
-            
+
             # Retrieve password with security priority:
             # 1. Environment variable (most secure for automation)
             # 2. OS Keyring (if keyring package available)
             # 3. Base64-encoded config (fallback, backward compatible)
             password = self._get_secure_password(conf)
-            
+
             msg = MIMEMultipart()
             msg["From"] = sender_email
             msg["To"] = receiver_email
             msg["Subject"] = f"[DST Alert] {subject}"
-            
+
             msg.attach(MIMEText(message, "plain"))
-            
+
             context = ssl.create_default_context()
-            
+
             with smtplib.SMTP(smtp_server, smtp_port) as server:
                 server.starttls(context=context)
                 server.login(sender_email, password)
                 server.sendmail(sender_email, receiver_email, msg.as_string())
-                
+
             self.logger.log_operation("ALERT_SENT", "system", f"Sent: {subject}")
-            
+
             # Update state
             state["last_sent"] = now_ts
             self._save_state(state)
             return True
-            
+
         except Exception as e:
             self.logger.log_error(e, "ALERT_SEND_FAILED")
             return False

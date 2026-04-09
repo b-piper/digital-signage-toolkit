@@ -2,7 +2,7 @@
 
 class ModernTheme:
     """Modern dark theme based on Zinc palette."""
-    
+
     # Color Palette (Zinc & Indigo)
     COLORS = {
         "bg_primary": "#18181b",      # Zinc 950
