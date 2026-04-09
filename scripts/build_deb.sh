@@ -49,7 +49,7 @@ Version: ${VERSION}
 Section: utils
 Priority: optional
 Architecture: ${ARCH}
-Depends: python3
+Depends: python3, python3-venv, python3-pip, python3-pyqt6, python3-psutil, scrot, libxcb-cursor0, libxcb-keysyms1, libxcb-shape0, libxcb-icccm4, libxcb-image0, libxcb-randr0, libxcb-render-util0, libxcb-xinerama0, libxkbcommon-x11-0
 Maintainer: IT Department <it@southwesterncc.edu>
 Description: Digital Signage Toolkit
  A comprehensive management utility for Rise Vision Player kiosks.
@@ -57,11 +57,12 @@ Description: Digital Signage Toolkit
 EOF
 
 # 4. Create Post-Install Script
-# This handles all dependency installation and virtualenv setup
+# NOTE: Cannot call apt-get here — dpkg holds the database lock during postinst.
+# All apt dependencies are declared in the Depends line above and resolved by dpkg/apt
+# BEFORE this script runs. This script only handles venv/pip setup.
 echo "[*] Creating postinst script..."
 cat <<EOF > "${BUILD_DIR}/DEBIAN/postinst"
 #!/bin/bash
-set -e
 export DEBIAN_FRONTEND=noninteractive
 
 APP_DIR="/opt/${PKG_NAME}"
@@ -69,44 +70,23 @@ LOG="/var/log/dst-toolkit-install.log"
 
 case "\$1" in
     configure)
-        echo "[DST] Installing Digital Signage Toolkit..." | tee "\$LOG"
-        
-        # Install system dependencies
-        echo "[DST] Updating package lists..." | tee -a "\$LOG"
-        apt-get update -qq >> "\$LOG" 2>&1
-        
-        echo "[DST] Installing system dependencies..." | tee -a "\$LOG"
-        apt-get install -y -qq \
-            python3-venv \
-            python3-pip \
-            python3-pyqt6 \
-            python3-psutil \
-            scrot \
-            libxcb-cursor0 \
-            libxcb-keysyms1 \
-            libxcb-shape0 \
-            libxcb-icccm4 \
-            libxcb-image0 \
-            libxcb-randr0 \
-            libxcb-render-util0 \
-            libxcb-xinerama0 \
-            libxkbcommon-x11-0 >> "\$LOG" 2>&1
+        echo "[DST] Configuring Digital Signage Toolkit..." | tee "\$LOG"
         
         # Create venv if not exists
         echo "[DST] Setting up Python Virtual Environment..." | tee -a "\$LOG"
         if [ ! -d "\$APP_DIR/venv" ]; then
-            python3 -m venv --system-site-packages "\$APP_DIR/venv"
+            python3 -m venv --system-site-packages "\$APP_DIR/venv" >> "\$LOG" 2>&1
         fi
         
         # Install Pip Requirements
         echo "[DST] Installing Python Dependencies..." | tee -a "\$LOG"
-        "\$APP_DIR/venv/bin/pip" install --upgrade pip >> "\$LOG" 2>&1
+        "\$APP_DIR/venv/bin/pip" install --upgrade pip >> "\$LOG" 2>&1 || true
         # Install pinned runtime dependencies
         if [ -f "\$APP_DIR/requirements-runtime.txt" ]; then
-            "\$APP_DIR/venv/bin/pip" install -r "\$APP_DIR/requirements-runtime.txt" >> "\$LOG" 2>&1
+            "\$APP_DIR/venv/bin/pip" install -r "\$APP_DIR/requirements-runtime.txt" >> "\$LOG" 2>&1 || true
         else
             echo "WARNING: requirements-runtime.txt not found, falling back to unpinned install" | tee -a "\$LOG"
-            "\$APP_DIR/venv/bin/pip" install qtawesome requests >> "\$LOG" 2>&1
+            "\$APP_DIR/venv/bin/pip" install qtawesome requests >> "\$LOG" 2>&1 || true
         fi
         
         # Fix permissions of app
@@ -140,7 +120,7 @@ case "\$1" in
         if [ -d /etc/systemd/system ]; then
             cp "\$APP_DIR/debian/dst-auto-update.timer" /etc/systemd/system/ 2>/dev/null || true
             cp "\$APP_DIR/debian/dst-auto-update.service" /etc/systemd/system/ 2>/dev/null || true
-            systemctl daemon-reload
+            systemctl daemon-reload 2>/dev/null || true
             systemctl enable dst-auto-update.timer 2>/dev/null || true
             systemctl start dst-auto-update.timer 2>/dev/null || true
         fi
@@ -154,6 +134,7 @@ esac
 
 exit 0
 EOF
+
 
 
 chmod 755 "${BUILD_DIR}/DEBIAN/postinst"
