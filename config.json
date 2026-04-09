@@ -16,8 +16,8 @@
     "desktop_file": "~/Desktop/SCC_Manager.desktop",
     "error_log": "/tmp/scc_last_error.log",
     "temp_dir": "/tmp",
-    "log_dir": "/var/log/digital-signage-toolkit",
-    "log_dir_fallback": "~/.local/log/digital-signage-toolkit"
+    "log_dir": "/var/log/dst-toolkit",
+    "log_dir_fallback": "~/.dst-toolkit/logs"
   },
   "watchdog": {
     "service_name": "rise-vision-player",

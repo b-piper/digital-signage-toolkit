@@ -152,20 +152,23 @@ class MasterSetupTab(BaseTab):
                     self.log("Installing Rise Vision Player...", "COMMAND")
                     rise_url = self.config.get('urls.rise_vision')
 
+                    rise_success = False
+
                     def rise_complete(success):
-                        if success:
-                            self.log("Rise Vision installed", "SUCCESS")
-                        else:
-                            self.log("Rise Vision installation failed", "ERROR")
-                        self.set_progress(90)
-                        self.finish_master_setup()
+                        nonlocal rise_success
+                        rise_success = success
 
                     self.software_installer.install_rise_vision(
                         rise_url, None,
                         self.config.expand_path('paths.player_startup'),
                         self.log, rise_complete
                     )
-                    return  # Will continue in callback
+
+                    if rise_success:
+                        self.log("Rise Vision installed", "SUCCESS")
+                    else:
+                        self.log("Rise Vision installation failed — watchdog setup will be skipped", "ERROR")
+                    self.set_progress(90)
 
                 self.set_progress(90)
                 self.finish_master_setup()

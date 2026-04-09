@@ -28,12 +28,22 @@ class LogViewerTab(BaseTab):
 
     def get_log_directory(self) -> Path:
         """Get the log directory from config, with fallback."""
-        log_dir = Path(self.config.get('paths.log_dir', '/var/log/digital-signage-toolkit'))
+        log_dir = Path(self.config.get('paths.log_dir', '/var/log/dst-toolkit'))
         if not log_dir.exists():
             # Try fallback path from config
             fallback = self.config.expand_path('paths.log_dir_fallback')
             if fallback:
-                log_dir = Path(fallback)
+                fallback_path = Path(fallback)
+                if fallback_path.exists():
+                    return fallback_path
+            # Final fallback: check where the logger is actually writing
+            try:
+                from digital_signage_toolkit.utils.logger import get_logger
+                logger = get_logger()
+                if logger.log_dir.exists():
+                    return logger.log_dir
+            except Exception:
+                pass
         return log_dir
 
     def setup_ui(self):

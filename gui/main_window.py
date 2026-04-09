@@ -294,8 +294,8 @@ class MainWindow(QMainWindow):
                     it.setIcon(qta.icon(icon_name, color="#a1a1aa"))
 
             # Special logic for hardware monitoring updates
-            # Tab 7 is Monitor (after adding Scheduler and Alerts)
-            if index == 7:
+            # Tab 6 is Monitoring (0=Master,1=OS,2=Watchdog,3=Restore,4=Sched,5=Alerts,6=Monitor,7=Logs)
+            if index == 6:
                 self.monitoring_tab.update_monitoring_info()
 
     def _create_tabs(self):
@@ -344,8 +344,8 @@ class MainWindow(QMainWindow):
 
     def _update_monitoring(self):
         """Update monitoring information in the Monitoring tab."""
-        # Only update if monitoring tab is visible (tab index 5)
-        if self.page_stack.currentIndex() == 5 and hasattr(self, 'monitoring_tab'):
+        # Only update if monitoring tab is visible (tab index 6)
+        if self.page_stack.currentIndex() == 6 and hasattr(self, 'monitoring_tab'):
             self.monitoring_tab.update_monitoring_info()
 
     def reboot_system(self):

@@ -91,8 +91,10 @@ class WatchdogTab(BaseTab):
             self.update_watchdog_status()
             self.set_status("Watchdog Enabled", "success")
         else:
-            self.log("Failed to enable watchdog", "ERROR")
+            error_msg = self.watchdog_manager.last_error or "Unknown error"
+            self.log(f"Failed to enable watchdog: {error_msg}", "ERROR")
             self.set_status("Watchdog Enable Failed", "error")
+            self.show_error("Watchdog Enable Failed", error_msg)
 
     def disable_watchdog(self):
         """Disable watchdog."""

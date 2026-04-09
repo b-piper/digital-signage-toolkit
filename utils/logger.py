@@ -172,7 +172,7 @@ def get_logger() -> AuditLogger:
             _logger_instance = AuditLogger()
         except PermissionError:
             # Fallback to user directory if we can't write to /var/log
-            user_log_dir = Path.home() / '.local' / 'log' / 'digital-signage-toolkit'
+            user_log_dir = Path.home() / '.dst-toolkit' / 'logs'
             _logger_instance = AuditLogger(user_log_dir)
 
     return _logger_instance

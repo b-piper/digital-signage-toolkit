@@ -26,6 +26,7 @@ class WatchdogManager:
         self.current_home = os.path.expanduser('~')
         self.logger = get_logger()
         self._service_creation_lock = threading.Lock()  # Prevent race conditions
+        self.last_error = ""  # Human-readable error from last failed operation
 
     @log_operation_errors("CHECK_SERVICE_STATUS")
     def is_enabled(self) -> bool:
@@ -186,9 +187,29 @@ WantedBy=graphical.target
     @log_operation_errors("ENABLE_SYSTEMD_SERVICE")
     def enable(self) -> bool:
         """Enable and start the systemd service."""
+        self.last_error = ""
+
+        # Check if Rise Vision Player is installed first
+        player_path = Path(self.player_startup).expanduser()
+        if not player_path.exists():
+            self.last_error = (
+                "Rise Vision Player is not installed.\n"
+                f"Expected startup script: {player_path}\n\n"
+                "Please install Rise Vision Player first via Master Setup."
+            )
+            self.logger.log_error(
+                FileNotFoundError(f"Player startup script not found: {player_path}"),
+                "ENABLE_SYSTEMD_SERVICE"
+            )
+            return False
+
         # Create service file if it doesn't exist
         if not self.service_file.exists():
             if not self.create_systemd_service():
+                self.last_error = (
+                    "Failed to create systemd service file.\n"
+                    "Check logs for details."
+                )
                 return False
 
         # Enable service (start on boot)
@@ -197,6 +218,7 @@ WantedBy=graphical.target
             timeout=10
         )
         if enable_result.returncode != 0:
+            self.last_error = f"Failed to enable service: {enable_result.stderr}"
             self.logger.log_error(
                 RuntimeError(f"Failed to enable service: {enable_result.stderr}"),
                 "ENABLE_SYSTEMD_SERVICE"
@@ -217,6 +239,7 @@ WantedBy=graphical.target
                 True
             )
         else:
+            self.last_error = f"Service enabled but failed to start: {start_result.stderr}"
             self.logger.log_error(
                 RuntimeError(f"Failed to start service: {start_result.stderr}"),
                 "ENABLE_SYSTEMD_SERVICE"

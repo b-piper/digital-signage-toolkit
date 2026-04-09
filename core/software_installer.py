@@ -166,7 +166,7 @@ class SoftwareInstaller:
                            startup_script_path: str = "~/rvplayer/scripts/start.sh",
                            log_callback: Optional[Callable[[str], None]] = None,
                            completion_callback: Optional[Callable[[bool], None]] = None) -> None:
-        """Install Rise Vision Player (async, requires user interaction)."""
+        """Install Rise Vision Player (synchronous, with proper display env)."""
         startup_path = Path(os.path.expanduser(startup_script_path))
 
         if startup_path.exists() and startup_path.stat().st_size > 0:
@@ -199,11 +199,20 @@ class SoftwareInstaller:
         else:
             # Download installer
             temp_installer = '/tmp/installer-lnx-64.sh'
+            if log_callback:
+                log_callback(f"Downloading Rise Vision installer from {url}...")
             if self.download_file(url, temp_installer, expected_checksum=expected_checksum, log_callback=log_callback):
                 installer_path = temp_installer
+                if log_callback:
+                    log_callback("Download complete")
             else:
                 if log_callback:
-                    log_callback("Failed to download Rise Vision installer")
+                    log_callback("❌ Failed to download Rise Vision installer")
+                    log_callback("Check internet connectivity and URL configuration")
+                self.logger.log_error(
+                    RuntimeError(f"Rise Vision installer download failed from {url}"),
+                    "INSTALL_RISE_VISION"
+                )
                 if completion_callback:
                     completion_callback(False)
                 return
@@ -212,30 +221,74 @@ class SoftwareInstaller:
         if installer_path:
             os.chmod(installer_path, 0o755)
             if log_callback:
-                log_callback("Launching Rise Vision installer...")
-                log_callback("⚠️  If the Player opens, CLOSE IT to continue setup.")
+                log_callback("Launching Rise Vision installer (silent)...")
 
-            # Launch installer in background
-            process = subprocess.Popen(
-                [installer_path],
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                text=True
-            )
+            # Set up environment with display access for the installer
+            env = os.environ.copy()
+            env['DISPLAY'] = os.environ.get('DISPLAY', ':0')
+            # Try to find XAUTHORITY
+            sudo_user = os.environ.get('SUDO_USER', '')
+            if sudo_user:
+                xauth = f"/home/{sudo_user}/.Xauthority"
+            else:
+                xauth = os.path.expanduser("~/.Xauthority")
+            env['XAUTHORITY'] = os.environ.get('XAUTHORITY', xauth)
+            env['HOME'] = os.environ.get('SUDO_HOME', os.path.expanduser('~'))
 
-            # Monitor for completion
-            def monitor_installer():
+            try:
+                # Run the installer and wait for completion (synchronous)
+                process = subprocess.Popen(
+                    [installer_path],
+                    stdout=subprocess.PIPE,
+                    stderr=subprocess.PIPE,
+                    text=True,
+                    env=env
+                )
+
+                # Wait for completion with timeout
                 try:
-                    process.wait(timeout=600)  # 10 minute timeout
-                    if completion_callback:
-                        completion_callback(process.returncode == 0)
+                    stdout, stderr = process.communicate(timeout=600)  # 10 minute timeout
+                    if process.returncode == 0:
+                        if log_callback:
+                            log_callback("✅ Rise Vision installer completed successfully")
+                        # Verify installation by checking for startup script
+                        if startup_path.exists():
+                            if log_callback:
+                                log_callback("✅ Rise Vision Player startup script found")
+                        else:
+                            if log_callback:
+                                log_callback("⚠️ Installer completed but startup script not yet found")
+                                log_callback("The player may need a reboot to complete setup")
+                        if completion_callback:
+                            completion_callback(True)
+                    else:
+                        error_detail = stderr.strip() if stderr else stdout.strip() if stdout else "Unknown error"
+                        if log_callback:
+                            log_callback(f"❌ Rise Vision installer failed (exit code {process.returncode})")
+                            if error_detail:
+                                log_callback(f"   Error: {error_detail[:200]}")
+                        self.logger.log_error(
+                            RuntimeError(f"Rise Vision installer exited with code {process.returncode}: {error_detail[:500]}"),
+                            "INSTALL_RISE_VISION"
+                        )
+                        if completion_callback:
+                            completion_callback(False)
                 except subprocess.TimeoutExpired:
                     process.kill()
+                    if log_callback:
+                        log_callback("❌ Rise Vision installer timed out after 10 minutes")
+                    self.logger.log_error(
+                        TimeoutError("Rise Vision installer timed out after 600 seconds"),
+                        "INSTALL_RISE_VISION"
+                    )
                     if completion_callback:
                         completion_callback(False)
-
-            import threading
-            threading.Thread(target=monitor_installer, daemon=True).start()
+            except Exception as e:
+                if log_callback:
+                    log_callback(f"❌ Error running Rise Vision installer: {e}")
+                self.logger.log_error(e, "INSTALL_RISE_VISION")
+                if completion_callback:
+                    completion_callback(False)
 
     def fix_rise_permissions(self, player_dir: str = "~/rvplayer",
                            log_callback: Optional[Callable[[str], None]] = None) -> bool:
