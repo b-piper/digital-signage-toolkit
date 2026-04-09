@@ -190,46 +190,142 @@ dpkg-deb --build "${BUILD_DIR}"
 
 mv "build/${FULL_NAME}.deb" .
 
-# 9. Generate Install Script
+# 9. Generate GUI Install Script
+# This uses zenity (pre-installed on Ubuntu GNOME) for a fully graphical install experience.
+# Technician flow: right-click → Properties → Allow Executing → double-click → enter password → done.
 echo "[*] Generating install.sh..."
 cat <<'INSTALL_EOF' > install.sh
 #!/bin/bash
-# Digital Signage Toolkit - One-Step Installer
-# Usage: sudo bash install.sh
-set -e
+# ============================================================
+# Digital Signage Toolkit - GUI Installer
+# ============================================================
+# Double-click this file to install (after marking executable).
+# Or run from terminal: sudo bash install.sh
+# ============================================================
 
-if [ "$EUID" -ne 0 ]; then
-    echo "Error: Please run as root (sudo bash install.sh)"
-    exit 1
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+DEB_FILE=$(ls "$SCRIPT_DIR"/dst-toolkit_*.deb 2>/dev/null | head -1)
+LOG_FILE="/tmp/dst-toolkit-install.log"
+
+# --- Helper: detect if zenity is available for GUI mode ---
+HAS_ZENITY=false
+if command -v zenity >/dev/null 2>&1 && [ -n "$DISPLAY" ]; then
+    HAS_ZENITY=true
 fi
 
-DEB_FILE=$(ls dst-toolkit_*.deb 2>/dev/null | head -1)
+show_error() {
+    if $HAS_ZENITY; then
+        zenity --error --title="DST Install Error" --text="$1" --width=400 2>/dev/null
+    fi
+    echo "ERROR: $1" >&2
+    exit 1
+}
 
+show_info() {
+    if $HAS_ZENITY; then
+        zenity --info --title="Digital Signage Toolkit" --text="$1" --width=400 2>/dev/null
+    fi
+    echo "$1"
+}
+
+# --- Check for .deb file ---
 if [ -z "$DEB_FILE" ]; then
-    echo "Error: No .deb file found in current directory."
-    echo "Place this script in the same folder as the dst-toolkit_*.deb file."
-    exit 1
+    show_error "No dst-toolkit_*.deb file found.\n\nPlace this script in the same folder as the .deb file."
 fi
 
-echo "==========================================="
-echo "   Installing Digital Signage Toolkit"
-echo "   Package: $DEB_FILE"
-echo "==========================================="
+# --- If not root, re-launch with pkexec (GUI password prompt) ---
+if [ "$EUID" -ne 0 ]; then
+    if command -v pkexec >/dev/null 2>&1; then
+        # pkexec runs the script as root with a GUI password dialog
+        pkexec bash "$0" "$@"
+        exit $?
+    else
+        show_error "This installer must be run as root.\n\nOpen a terminal and run:\n  sudo bash install.sh"
+    fi
+fi
 
-echo "[1/3] Updating package lists..."
-apt-get update -qq
+# --- We are root from here ---
+DEB_NAME=$(basename "$DEB_FILE")
 
-echo "[2/3] Installing package..."
-dpkg -i "$DEB_FILE" || true
+do_install() {
+    echo "# Updating package lists..." ; echo "10"
+    apt-get update -qq >> "$LOG_FILE" 2>&1
 
-echo "[3/3] Resolving dependencies..."
-apt-get install -f -y -qq
+    echo "# Installing $DEB_NAME and dependencies..." ; echo "40"
+    apt-get install -y -qq "$DEB_FILE" >> "$LOG_FILE" 2>&1
+    INSTALL_RESULT=$?
 
-echo "==========================================="
-echo "   Installation Complete!"
-echo "   Launch from Applications menu or run:"
-echo "     dst-toolkit-gui"
-echo "==========================================="
+    if [ $INSTALL_RESULT -ne 0 ]; then
+        echo "# Resolving dependencies..." ; echo "60"
+        dpkg -i "$DEB_FILE" >> "$LOG_FILE" 2>&1 || true
+        apt-get install -f -y -qq >> "$LOG_FILE" 2>&1
+    fi
+
+    echo "# Verifying installation..." ; echo "90"
+    dpkg -s dst-toolkit >> "$LOG_FILE" 2>&1
+    VERIFY_RESULT=$?
+
+    echo "# Done" ; echo "100"
+    return $VERIFY_RESULT
+}
+
+# --- Run installation with GUI progress bar or terminal output ---
+echo "=== DST Install Log $(date) ===" > "$LOG_FILE"
+
+if $HAS_ZENITY; then
+    do_install | zenity --progress \
+        --title="Installing Digital Signage Toolkit" \
+        --text="Preparing..." \
+        --percentage=0 \
+        --auto-close \
+        --no-cancel \
+        --width=400 2>/dev/null
+
+    # Check if installation succeeded
+    if dpkg -s dst-toolkit >/dev/null 2>&1; then
+        zenity --info \
+            --title="Installation Complete" \
+            --text="Digital Signage Toolkit has been installed successfully!\n\nLaunch it from the Applications menu." \
+            --width=400 2>/dev/null
+    else
+        zenity --error \
+            --title="Installation Failed" \
+            --text="Installation encountered an error.\n\nCheck the log at:\n$LOG_FILE" \
+            --width=400 2>/dev/null
+        exit 1
+    fi
+else
+    # Terminal-only mode
+    echo "==========================================="
+    echo "   Installing Digital Signage Toolkit"
+    echo "   Package: $DEB_NAME"
+    echo "==========================================="
+
+    echo "[1/3] Updating package lists..."
+    apt-get update -qq
+
+    echo "[2/3] Installing package and dependencies..."
+    apt-get install -y "$DEB_FILE" || {
+        echo "[2/3] Retrying with dpkg + apt-get -f..."
+        dpkg -i "$DEB_FILE" || true
+        apt-get install -f -y -qq
+    }
+
+    echo "[3/3] Verifying installation..."
+    if dpkg -s dst-toolkit >/dev/null 2>&1; then
+        echo "==========================================="
+        echo "   Installation Complete!"
+        echo "   Launch from Applications menu or run:"
+        echo "     dst-toolkit-gui"
+        echo "==========================================="
+    else
+        echo "==========================================="
+        echo "   Installation FAILED"
+        echo "   Check log: $LOG_FILE"
+        echo "==========================================="
+        exit 1
+    fi
+fi
 INSTALL_EOF
 chmod 755 install.sh
 
@@ -237,3 +333,4 @@ echo "==========================================="
 echo "   Build Complete: ${FULL_NAME}.deb "
 echo "   Installer:      install.sh"
 echo "==========================================="
+
