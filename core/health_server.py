@@ -17,16 +17,52 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
     
     def do_GET(self):
         """Handle GET requests."""
+        if not self._check_auth():
+            return
+
         if self.path == '/health' or self.path == '/':
             self._handle_health_check()
-        elif self.path == '/metrics':
-            self._handle_metrics()
         else:
             self.send_response(404)
             self.send_header('Content-Type', 'application/json')
             self.end_headers()
             self.wfile.write(json.dumps({'error': 'Not found'}).encode())
     
+    def _check_auth(self) -> bool:
+        """Verify authentication token."""
+        # Lazily import Config to avoid circular imports if any
+        from digital_signage_toolkit.utils.config import Config
+        config = Config()
+        
+        # Check if auth is required (default to False for backward compatibility if missing)
+        security = config.get('security', {})
+        if not security.get('require_auth', False):
+            return True
+            
+        # Get expected token (Env var overrides config)
+        expected_token = os.environ.get('DST_API_TOKEN') or security.get('api_token')
+        
+        # If auth required but no token configured, deny access (Fail Secure)
+        if not expected_token or expected_token == 'CHANGEME':
+            print("Security Warning: Auth required but token not set/default.")
+            self._send_unauthorized("Configuration Error: API Token not set")
+            return False
+            
+        # Check header
+        provided_token = self.headers.get('X-Auth-Token')
+        if provided_token != expected_token:
+            self._send_unauthorized()
+            return False
+            
+        return True
+
+    def _send_unauthorized(self, message: str = "Unauthorized"):
+        """Send 401 Unauthorized response."""
+        self.send_response(401)
+        self.send_header('Content-Type', 'application/json')
+        self.end_headers()
+        self.wfile.write(json.dumps({'error': message}).encode())
+
     def _handle_health_check(self):
         """Return health status."""
         health = get_health_status()
@@ -38,15 +74,7 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(health, indent=2).encode())
     
-    def _handle_metrics(self):
-        """Return Prometheus-compatible metrics."""
-        metrics = get_prometheus_metrics()
-        
-        self.send_response(200)
-        self.send_header('Content-Type', 'text/plain; charset=utf-8')
-        self.end_headers()
-        self.wfile.write(metrics.encode())
-    
+
     def log_message(self, format, *args):
         """Suppress default logging."""
         pass
@@ -89,38 +117,7 @@ def get_health_status() -> dict:
     return status
 
 
-def get_prometheus_metrics() -> str:
-    """Generate Prometheus-compatible metrics."""
-    lines = []
-    
-    # Rise Vision status
-    rise_running = 1 if _check_rise_vision()['running'] else 0
-    lines.append(f'dst_rise_vision_running {rise_running}')
-    
-    # Disk usage
-    if psutil:
-        disk = psutil.disk_usage('/')
-        lines.append(f'dst_disk_usage_percent {disk.percent}')
-        lines.append(f'dst_disk_free_bytes {disk.free}')
-        lines.append(f'dst_disk_total_bytes {disk.total}')
-    
-    # Memory usage
-    if psutil:
-        memory = psutil.virtual_memory()
-        lines.append(f'dst_memory_usage_percent {memory.percent}')
-        lines.append(f'dst_memory_available_bytes {memory.available}')
-        lines.append(f'dst_memory_total_bytes {memory.total}')
-    
-    # CPU usage
-    if psutil:
-        cpu_percent = psutil.cpu_percent(interval=0.1)
-        lines.append(f'dst_cpu_usage_percent {cpu_percent}')
-    
-    # Uptime
-    uptime = _get_uptime()
-    lines.append(f'dst_uptime_seconds {uptime}')
-    
-    return '\n'.join(lines) + '\n'
+
 
 
 def _get_hostname() -> str:

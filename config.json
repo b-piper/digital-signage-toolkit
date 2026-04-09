@@ -3,6 +3,10 @@
     "teamviewer": "https://download.teamviewer.com/download/linux/teamviewer_amd64.deb",
     "rise_vision": "https://storage.googleapis.com/install-versions.risevision.com/installer-lnx-64.sh"
   },
+  "security": {
+    "api_token": "CHANGEME",
+    "require_auth": true
+  },
   "paths": {
     "watchdog_script": "~/check_rise.sh",
     "log_path": "~/rise_log.txt",

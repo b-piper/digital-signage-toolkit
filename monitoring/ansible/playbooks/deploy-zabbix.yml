@@ -1,0 +1,41 @@
+---
+# Deploy Zabbix Agent to Kiosks
+# Run: ansible-playbook -i inventory/hosts.ini playbooks/deploy-zabbix.yml
+
+- name: Deploy Zabbix Agent
+  hosts: kiosks
+  become: yes
+  vars:
+    zabbix_server: "zabbix.southwesterncc.edu"  # Change this to your Zabbix Server IP/Hostname
+    zabbix_server_active: "zabbix.southwesterncc.edu"
+
+  tasks:
+    - name: Install Zabbix Agent
+      apt:
+        name: zabbix-agent
+        state: present
+        update_cache: yes
+
+    - name: Configure Zabbix Agent (Server)
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^Server='
+        line: "Server={{ zabbix_server }}"
+
+    - name: Configure Zabbix Agent (ServerActive)
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^ServerActive='
+        line: "ServerActive={{ zabbix_server_active }}"
+
+    - name: Configure Zabbix Agent (Hostname)
+      lineinfile:
+        path: /etc/zabbix/zabbix_agentd.conf
+        regexp: '^Hostname='
+        line: "Hostname={{ inventory_hostname }}"
+
+    - name: Restart Zabbix Agent
+      service:
+        name: zabbix-agent
+        state: restarted
+        enabled: yes

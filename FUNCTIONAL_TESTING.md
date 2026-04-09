@@ -1,64 +1,53 @@
-# Functional Testing Guide
+# Functional Testing Guide (Updated)
 
 Use this guide to verify the **Application Features** of the Digital Signage Toolkit.
 
-## 1. System Operations
+## 1. System Operations (Fixed in v2.2.5)
 **Goal:** Verify the toolkit can control the device.
 
 1.  **Open the App:** Launch "Digital Signage Toolkit" from the desktop.
-2.  **Go to "System Restore" Tab:**
+2.  **Go to "System Operations & Restore" Tab (New Name):**
     *   Click "Clear Rise Vision Cache".
-        *   **Verify:** Should say "Success" (or "Cache cleared" in logs).
-    *   Click "Restart Player".
-        *   **Verify:** Since you don't have the player, it might say "Failed" or "Service not found", but acts of trying confirm the button works.
-3.  **Go to "Power" (Top Right):**
-    *   Click "Reboot System".
-    *   **Verify:** Does a confirmation dialog appear? (Don't actually reboot unless you want to).
+        *   **Verify:** Should say "Success".
+    *   Click "Restart Player Service".
+        *   **Verify:** It updates the status bar.
 
 ## 2. Scheduler (Daily Reboot)
 **Goal:** Verify the cron job is created.
 
 1.  **Go to "Scheduler" Tab:**
-    *   Set "Daily Reboot" to **enabled**.
-    *   Set time to `04:15` (Something unique).
+    *   Set "Daily Reboot" to **enabled** (Time: `04:15`).
     *   Click "Apply Schedule".
 2.  **Verify via Terminal:**
     ```bash
-    cat /etc/cron.d/dst_reboot
+    cat /etc/cron.d/dst-schedule
     ```
-    *   **Pass Criteria:** File should exist and contain `15 04 * * * root ... /sbin/reboot`.
+    *   **Pass Criteria:** File should exist and contain `15 04 * * * root /sbin/reboot`.
+    *   *(Note: Previous instructions incorrectly said `dst_reboot`).*
 
 ## 3. Alerts (Email)
 **Goal:** Verify the toolkit can send emails.
 
 1.  **Go to "Alerts" Tab:**
-    *   Enter a **fake SMTP server** to test the error handling, OR real settings if you have them.
-        *   Host: `smtp.gmail.com`
-        *   Port: `587`
-        *   User: `test@example.com`
-        *   Pass: `test`
+    *   Enter fake SMTP settings (Host: `test`, User: `test`).
     *   Click "Send Test Email".
-    *   **Verify:** It should attempt to connect and show a Success or Error message.
-    *   **Check Logs:** Open the "Logs" tab -> "Application Log". You should see "Attempting to send test email..."
+    *   **Verify:** Error/Success message appears.
 
 ## 4. Installers (TeamViewer / Rise Vision)
 **Goal:** Verify the app detects software status.
 
 1.  **Go to "Master Setup" Tab:**
-    *   Look at the "Software Installation" section.
-    *   **Verify:**
-        *   The checkboxes for "Install TeamViewer" and "Install Rise Vision" should be **unchecked** (since you don't have them).
-        *   This confirms the detection logic is working.
+    *   **Verify:** Checkboxes state matches installed software.
 
 ## 5. Watchdog (Simulation)
-**Goal:** Verify the watchdog is active.
+**Goal:** Verify the watchdog service is active.
 
 1.  **Go to "Watchdog" Tab:**
-    *   Enable "Active Monitoring".
-    *   Set "Check Interval" to 1 minute.
-    *   Click "Save Settings".
+    *   Click "Enable Watchdog".
+    *   **Verify:** Status label changes to "Active".
 2.  **Verify via Terminal:**
     ```bash
-    cat /etc/cron.d/dst_watchdog
+    systemctl status rise-vision-player
     ```
-    *   **Pass Criteria:** File should exist and run every 1 minute.
+    *   **Pass Criteria:** Should show service status.
+    *   *(Note: Previous instructions incorrectly said `cron.d/dst_watchdog`).*

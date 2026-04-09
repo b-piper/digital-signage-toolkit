@@ -77,8 +77,13 @@ case "\$1" in
         # Install Pip Requirements
         echo "[DST] Installing Python Dependencies..."
         "\$APP_DIR/venv/bin/pip" install --upgrade pip
-        # Install only non-system packages (PyQt6 and psutil come from system)
-        "\$APP_DIR/venv/bin/pip" install qtawesome requests || true
+        # Install pinned runtime dependencies
+        if [ -f "\$APP_DIR/requirements-runtime.txt" ]; then
+            "\$APP_DIR/venv/bin/pip" install -r "\$APP_DIR/requirements-runtime.txt"
+        else
+            echo "WARNING: requirements-runtime.txt not found, falling back to unpinned install"
+            "\$APP_DIR/venv/bin/pip" install qtawesome requests
+        fi
         
         # Determine user facing launcher
         # We can't easily predict the user here, but we can set permissions so any user can run it
