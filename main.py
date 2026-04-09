@@ -172,6 +172,7 @@ def main():
         logger.app_logger.warning("Warning: This application is designed for Linux systems.")
 
     # Create application
+    from PyQt6.QtWidgets import QApplication
     app = QApplication(sys.argv)
     app.setApplicationName("Digital Signage Toolkit")
     app.setOrganizationName("Southwestern CC")
