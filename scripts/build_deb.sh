@@ -62,6 +62,7 @@ echo "[*] Creating postinst script..."
 cat <<EOF > "${BUILD_DIR}/DEBIAN/postinst"
 #!/bin/bash
 set -e
+export DEBIAN_FRONTEND=noninteractive
 
 APP_DIR="/opt/${PKG_NAME}"
 
