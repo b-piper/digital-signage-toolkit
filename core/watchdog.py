@@ -66,6 +66,20 @@ class WatchdogManager:
                 startup_path_str = startup_path_str.replace('~', self.current_home, 1)
             player_path = Path(startup_path_str).expanduser().resolve()
 
+            # If the default path doesn't exist, check common fallback paths 
+            # (Rise Vision updates often change binary locations)
+            if not player_path.exists():
+                fallbacks = [
+                    Path(self.current_home) / 'rvplayer' / 'rvplayer',
+                    Path(self.current_home) / 'rvplayer' / 'rvplayer.sh',
+                    Path(self.current_home) / 'rvplayer' / 'scripts' / 'start.sh',
+                    Path(self.current_home) / 'RiseVisionPlayer' / 'RiseVisionPlayer'
+                ]
+                for fallback_path in fallbacks:
+                    if fallback_path.exists() and fallback_path.is_file():
+                        player_path = fallback_path
+                        break
+
             # Validate path doesn't contain shell metacharacters
             if not validate_script_path(str(player_path)):
                 self.logger.log_error(
@@ -115,6 +129,8 @@ class WatchdogManager:
                 exec_start_path = shlex.quote(str(player_path))
 
                 # Create systemd service file content
+                exec_cmd = f"/bin/bash {exec_start_path}" if player_path.suffix == '.sh' else exec_start_path
+                
                 service_content = f"""[Unit]
 Description=Rise Vision Player Service
 After=graphical.target network-online.target
@@ -129,7 +145,7 @@ WorkingDirectory={shlex.quote(player_dir)}
 Environment="DISPLAY=:0"
 Environment="XAUTHORITY={shlex.quote(xauth_str)}"
 Environment="HOME={shlex.quote(self.current_home)}"
-ExecStart=/bin/bash {exec_start_path}
+ExecStart={exec_cmd}
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -195,16 +211,16 @@ WantedBy=graphical.target
         """Enable and start the systemd service."""
         self.last_error = ""
 
-        # Check if Rise Vision Player is installed first
-        player_path = Path(self.player_startup).expanduser()
-        if not player_path.exists():
+        # Check if Rise Vision Player is installed first (using validation with fallbacks)
+        is_valid, player_path = self._validate_player_startup_path()
+        if not is_valid or player_path is None:
             self.last_error = (
                 "Rise Vision Player is not installed.\n"
-                f"Expected startup script: {player_path}\n\n"
+                f"Expected startup script at or near: {self.player_startup}\n\n"
                 "Please install Rise Vision Player first via Master Setup."
             )
             self.logger.log_error(
-                FileNotFoundError(f"Player startup script not found: {player_path}"),
+                FileNotFoundError("Player startup script not found in configured path or fallbacks."),
                 "ENABLE_SYSTEMD_SERVICE"
             )
             return False
@@ -341,9 +357,13 @@ WantedBy=graphical.target
         if not is_valid or player_path is None:
             return None
 
-        # Get application root (3 levels up from player_startup)
+        # Get application root correctly based on the toolkit's own file location
+        # __file__ = core/watchdog.py
+        # parent = core
+        # parent.parent = digital_signage_toolkit
+        # parent.parent.parent = root directory
         try:
-            app_root = player_path.parent.parent.parent
+            app_root = Path(__file__).resolve().parent.parent.parent
             if not app_root.exists():
                 self.logger.log_error(
                     ValueError(f"Application root not found: {app_root}"),
@@ -556,11 +576,13 @@ WantedBy=timers.target
 
         autostart_dir.mkdir(parents=True, exist_ok=True)
 
-        # Use validated absolute path, properly escaped
+        # Use validated absolute path, properly escaped. Check if it requires bash
+        exec_cmd = f"bash {shlex.quote(str(player_path))}" if player_path.suffix == '.sh' else shlex.quote(str(player_path))
+        
         desktop_content = f"""[Desktop Entry]
 Type=Application
 Name=Rise Vision Player
-Exec=bash {shlex.quote(str(player_path))}
+Exec={exec_cmd}
 X-GNOME-Autostart-enabled=true
 Comment=Start Rise Vision Player
 """

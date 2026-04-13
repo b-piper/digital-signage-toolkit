@@ -134,7 +134,7 @@ class OSUpgradeTab(BaseTab):
                 )
                 
                 check_output = (check_result.stdout or '') + (check_result.stderr or '')
-                if check_result.returncode != 0 and 'No new release found' in check_output:
+                if 'no new release' in check_output.lower():
                     self.log("No OS upgrade available. System is up to date.", "SUCCESS")
                     self.set_progress(100)
                     self.set_status("System Up To Date", "success")
@@ -168,7 +168,17 @@ class OSUpgradeTab(BaseTab):
                     self.system_ops.reboot()
                     return True
                 else:
-                    self.log(f"Upgrade failed: {result.stderr}", "ERROR")
+                    error_details = (result.stdout or '').strip() + '\n' + (result.stderr or '').strip()
+                    if not error_details.strip():
+                        error_details = "Command failed with no output."
+                    
+                    self.log(f"Upgrade failed (Exit {result.returncode}):\n{error_details}", "ERROR")
+                    
+                    self.show_error(
+                        "Upgrade Failed",
+                        f"The OS upgrade process failed to complete.\n\nDetails:\n{error_details[:500]}"
+                    )
+                    
                     self.set_status("Upgrade Failed", "error")
                     return False
 
