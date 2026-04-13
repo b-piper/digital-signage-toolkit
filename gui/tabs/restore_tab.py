@@ -1,4 +1,4 @@
-"""System Operations & Restore tab for Digital Signage Toolkit."""
+"""System Restore tab for Digital Signage Toolkit."""
 from datetime import datetime
 
 from digital_signage_toolkit.gui.tabs.base_tab import BaseTab
@@ -6,7 +6,7 @@ from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QListWidget, QMessag
 
 
 class RestoreTab(BaseTab):
-    """Tab for System Operations and Restore functions."""
+    """Tab for Timeshift system snapshot management."""
 
     def __init__(self, main_window):
         super().__init__(main_window)
@@ -14,36 +14,9 @@ class RestoreTab(BaseTab):
         self.refresh_snapshots()
 
     def setup_ui(self):
-        """Set up the System Ops & Restore tab UI."""
+        """Set up the System Restore tab UI."""
 
-        # --- Section 1: System Operations ---
-        ops_group = QGroupBox("Rise Vision Operations")
-        ops_group.setStyleSheet("QGroupBox { font-weight: bold; border: 1px solid #3f3f46; margin-top: 10px; } QGroupBox::title { subcontrol-origin: margin; left: 10px; padding: 0 5px; }")
-        ops_layout = QHBoxLayout()
-
-        # Clear Cache Button
-        clear_cache_btn = QPushButton("🧹 Clear Rise Vision Cache")
-        clear_cache_btn.setToolTip("Deletes temporary files. Useful if content isn't updating.")
-        clear_cache_btn.clicked.connect(self.clear_cache)
-        ops_layout.addWidget(clear_cache_btn)
-
-        # Restart Player Button
-        restart_player_btn = QPushButton("🔄 Restart Player Service")
-        restart_player_btn.setToolTip("Restarts the Rise Vision background service.")
-        restart_player_btn.clicked.connect(self.restart_player)
-        ops_layout.addWidget(restart_player_btn)
-
-        # Reboot System Button
-        reboot_btn = QPushButton("⚠️ Reboot System")
-        reboot_btn.setProperty("class", "danger")
-        reboot_btn.setStyleSheet("background-color: #ef4444; color: white;")
-        reboot_btn.clicked.connect(self.reboot_system)
-        ops_layout.addWidget(reboot_btn)
-
-        ops_group.setLayout(ops_layout)
-        self.layout.addWidget(ops_group)
-
-        # --- Section 2: Timeshift Snapshots ---
+        # --- Timeshift Snapshots ---
         snapshot_group = QGroupBox("System Restore (Timeshift Snapshots)")
         snapshot_layout = QVBoxLayout()
 
@@ -71,68 +44,26 @@ class RestoreTab(BaseTab):
         self.snapshot_list = QListWidget()
         snapshot_layout.addWidget(self.snapshot_list)
 
-        # Restore Button
+        # Action buttons
+        action_layout = QHBoxLayout()
+
         restore_btn = QPushButton("↺ Restore Selected Snapshot")
         restore_btn.setProperty("class", "danger")
         restore_btn.setStyleSheet("background-color: #ef4444; color: white; padding: 10px;")
         restore_btn.clicked.connect(self.restore_snapshot)
-        snapshot_layout.addWidget(restore_btn)
+        action_layout.addWidget(restore_btn)
+
+        delete_btn = QPushButton("🗑️ Delete Selected")
+        delete_btn.setStyleSheet("background-color: #71717a; color: white; padding: 10px;")
+        delete_btn.clicked.connect(self.delete_snapshot)
+        action_layout.addWidget(delete_btn)
+
+        snapshot_layout.addLayout(action_layout)
 
         snapshot_group.setLayout(snapshot_layout)
         self.layout.addWidget(snapshot_group)
 
         self.layout.addStretch()
-
-    # --- Operation Methods ---
-
-    def clear_cache(self):
-        """Clear Rise Vision cache."""
-        if not self.confirm_action("Clear Cache", "Are you sure you want to clear the Rise Vision Player cache?"):
-            return
-
-        self.set_status("Clearing Cache...", "working")
-
-        def run_clear():
-            try:
-                self.log("Clearing Rise Vision cache...", "COMMAND")
-                self.software_installer.clear_rise_cache(self.log)
-                self.log("Cache cleared successfully", "SUCCESS")
-                self.set_status("Cache Cleared", "success")
-            except Exception as e:
-                self.log(f"Failed to clear cache: {e}", "ERROR")
-                self.set_status("Clear Cache Failed", "error")
-
-        self.start_worker(run_clear)
-
-    def restart_player(self):
-        """Restart Rise Vision Player."""
-        if not self.confirm_action("Restart Player", "Restart the Rise Vision Player service?"):
-            return
-
-        self.set_status("Restarting Player...", "working")
-
-        def run_restart():
-            try:
-                self.log("Restarting Rise Vision service...", "COMMAND")
-                self.system_ops.toggle_rise_player('restart')
-                self.log("Service restart command sent", "SUCCESS")
-                self.set_status("Player Restarted", "success")
-            except Exception as e:
-                self.log(f"Failed to restart player: {e}", "ERROR")
-                self.set_status("Restart Failed", "error")
-
-        self.start_worker(run_restart)
-
-    def reboot_system(self):
-        """Reboot the system."""
-        if not self.confirm_action("Reboot System", "Are you sure you want to reboot the system immediately?"):
-            return
-
-        try:
-            self.log("Initiating system reboot...", "WARNING")
-            self.system_ops.reboot()
-        except Exception as e:
-            self.show_error("Reboot Failed", str(e))
 
     # --- Snapshot Methods ---
 
@@ -140,33 +71,6 @@ class RestoreTab(BaseTab):
         """Refresh snapshot list."""
         self.log("Refreshing snapshots...", "COMMAND")
         self.set_status("Refreshing Snapshots...", "working")
-
-        def run_refresh():
-            snapshots = self.timeshift_manager.list_snapshots()
-            return snapshots
-
-        def on_complete(worker):
-            # This runs on main thread after worker finishes (need to implement worker result handling or just do UI update here)
-            # Since my start_worker helper doesn't easily return values, I'll just do it simply here or update start_worker
-            # For simplicity, let's just run list_snapshots on main thread if it's fast, or use the existing pattern
-            pass
-
-        # Since I can't easily change the threading model right now, let's stick to the previous pattern
-        # or just run it synchronously if list_snapshots is fast enough.
-        # Timeshift list can be slow.
-        # Let's use the pattern:
-
-        def refresh_op():
-            self.timeshift_manager.list_snapshots()
-            # We need to update UI on main thread.
-            # My BaseTab structure might rely on signals.
-            # Let's just do it directly for now, Timeshift listing isn't usually blocking for too long.
-            # But wait, interacting with subprocess in UI thread freezes UI.
-            pass
-
-        # Reverting to synchronous for simplicity unless confirmed slow.
-        # Actually, let's keep the original implementation's logic but wrap it better if needed.
-        # The original implementation was synchronous in __init__.
 
         snapshots = self.timeshift_manager.list_snapshots()
         self.snapshot_list.clear()
@@ -240,3 +144,36 @@ class RestoreTab(BaseTab):
                     self.set_status("Restore Failed", "error")
 
             self.timeshift_manager.restore_snapshot(snapshot_id, self.log, restore_complete)
+
+    def delete_snapshot(self):
+        """Delete the selected snapshot."""
+        selected = self.snapshot_list.currentItem()
+        if not selected or selected.text() == "No snapshots found":
+            self.show_error("No Selection", "Please select a snapshot to delete.")
+            return
+
+        snapshot_text = selected.text()
+        snapshot_id = snapshot_text.split(' - ')[0]
+
+        if not self.confirm_action(
+            "Delete Snapshot",
+            f"Delete snapshot:\n\n{snapshot_text}\n\nThis cannot be undone."
+        ):
+            return
+
+        self.log(f"Deleting snapshot: {snapshot_id}", "COMMAND")
+        self.set_status("Deleting Snapshot...", "working")
+
+        try:
+            success = self.timeshift_manager.delete_snapshot(snapshot_id)
+            if success:
+                self.log("Snapshot deleted", "SUCCESS")
+                self.set_status("Snapshot Deleted", "success")
+                self.refresh_snapshots()
+            else:
+                self.log("Failed to delete snapshot", "ERROR")
+                self.set_status("Delete Failed", "error")
+        except Exception as e:
+            self.log(f"Delete error: {e}", "ERROR")
+            self.set_status("Delete Failed", "error")
+

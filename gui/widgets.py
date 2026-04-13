@@ -1,7 +1,79 @@
 """Custom GUI widgets."""
-from PyQt6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QTimer
-from PyQt6.QtGui import QFont, QTextCursor
-from PyQt6.QtWidgets import QLabel, QProgressBar, QTextEdit, QVBoxLayout, QWidget
+from PyQt6.QtCore import QEasingCurve, QPointF, QPropertyAnimation, QRectF, Qt, QTimer
+from PyQt6.QtGui import QColor, QFont, QPainter, QPen, QTextCursor
+from PyQt6.QtWidgets import QCheckBox, QLabel, QProgressBar, QTextEdit, QVBoxLayout, QWidget
+
+
+class StyledCheckBox(QCheckBox):
+    """Custom checkbox with a visible checkmark indicator.
+
+    Replaces the default Qt checkbox which only fills with a solid color,
+    making it difficult to distinguish checked vs unchecked states.
+    This draws a clear white ✓ checkmark inside the indicator box.
+    """
+
+    def __init__(self, text="", parent=None):
+        super().__init__(text, parent)
+        self.setStyleSheet("""
+            QCheckBox {
+                spacing: 10px;
+                color: #e4e4e7;
+                padding: 4px 0px;
+                font-size: 14px;
+            }
+            QCheckBox::indicator {
+                width: 20px;
+                height: 20px;
+                border: 2px solid #52525b;
+                border-radius: 5px;
+                background: #18181b;
+            }
+            QCheckBox::indicator:hover {
+                border-color: #6366f1;
+                background: #27272a;
+            }
+            QCheckBox::indicator:checked {
+                background: #6366f1;
+                border-color: #6366f1;
+            }
+            QCheckBox::indicator:checked:hover {
+                background: #4f46e5;
+                border-color: #4f46e5;
+            }
+        """)
+
+    def paintEvent(self, event):
+        """Override paint to draw a checkmark when checked."""
+        super().paintEvent(event)
+
+        if self.isChecked():
+            painter = QPainter(self)
+            painter.setRenderHint(QPainter.RenderHint.Antialiasing)
+
+            # Calculate the indicator rect position
+            # The indicator is drawn at the left side of the checkbox
+            indicator_size = 20
+            spacing = 2  # border width
+            y_offset = (self.height() - indicator_size) / 2
+
+            # Draw the checkmark inside the indicator area
+            pen = QPen(QColor("#ffffff"), 2.5, Qt.PenStyle.SolidLine,
+                       Qt.PenCapStyle.RoundCap, Qt.PenJoinStyle.RoundJoin)
+            painter.setPen(pen)
+
+            # Checkmark path - scaled to fit inside the 20x20 indicator
+            x_start = spacing + 1
+            check_x = x_start + 5
+            check_y = y_offset + 11
+            mid_x = x_start + 9
+            mid_y = y_offset + 15
+            end_x = x_start + 16
+            end_y = y_offset + 6
+
+            painter.drawLine(QPointF(check_x, check_y), QPointF(mid_x, mid_y))
+            painter.drawLine(QPointF(mid_x, mid_y), QPointF(end_x, end_y))
+
+            painter.end()
 
 
 class LogConsole(QTextEdit):

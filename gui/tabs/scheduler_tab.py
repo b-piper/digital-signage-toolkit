@@ -1,7 +1,8 @@
 """Scheduler tab for Digital Signage Toolkit."""
 from digital_signage_toolkit.gui.tabs.base_tab import BaseTab
+from digital_signage_toolkit.gui.widgets import StyledCheckBox
 from PyQt6.QtCore import QTime
-from PyQt6.QtWidgets import QCheckBox, QGroupBox, QHBoxLayout, QLabel, QPushButton, QTimeEdit, QVBoxLayout
+from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QPushButton, QTimeEdit, QVBoxLayout
 
 
 class SchedulerTab(BaseTab):
@@ -22,7 +23,7 @@ class SchedulerTab(BaseTab):
         hint.setStyleSheet("color: #a1a1aa; font-style: italic;")
         reboot_layout.addWidget(hint)
 
-        self.reboot_check = QCheckBox("Enable Daily Reboot")
+        self.reboot_check = StyledCheckBox("Enable Daily Reboot")
         self.reboot_check.toggled.connect(self._on_change)
         reboot_layout.addWidget(self.reboot_check)
 
@@ -45,7 +46,7 @@ class SchedulerTab(BaseTab):
         power_group = QGroupBox("Power Conservation Schedule")
         power_layout = QVBoxLayout()
 
-        self.shutdown_check = QCheckBox("Enable Scheduled Shutdown (Save Power)")
+        self.shutdown_check = StyledCheckBox("Enable Scheduled Shutdown (Save Power)")
         self.shutdown_check.toggled.connect(self._on_change)
         power_layout.addWidget(self.shutdown_check)
 
@@ -92,21 +93,67 @@ class SchedulerTab(BaseTab):
         # In a real app we might style it to look "dirty"
 
     def load_schedule(self):
-        """Load current cron schedule."""
+        """Load current cron schedule from /etc/cron.d/dst-schedule."""
         self.set_status("Loading schedule...", "working")
 
-        def load_op():
-            # In a real impl, we'd parse /etc/cron.d/dst-start or similar
-            # Simulating load for now
-            return {
-                "reboot_enabled": False, # Default
-                "reboot_time": "03:00",
-                "shutdown_enabled": False
-            }
+        cron_path = "/etc/cron.d/dst-schedule"
+        reboot_enabled = False
+        reboot_time = "03:00"
+        shutdown_enabled = False
+        shutdown_time = "23:00"
 
-        # We don't have a CronManager class yet, so we'll mock it or
-        # use system_ops to read cron files in a future iteration.
-        # For this Sprint, we'll focus on the UI and 'Apply' logic structure.
+        try:
+            from pathlib import Path
+            cron_file = Path(cron_path)
+            if cron_file.exists():
+                content = cron_file.read_text()
+                for line in content.splitlines():
+                    line = line.strip()
+                    if not line or line.startswith('#') or line.startswith('SHELL') or line.startswith('PATH'):
+                        continue
+                    parts = line.split()
+                    if len(parts) >= 7:
+                        minute, hour = parts[0], parts[1]
+                        command = ' '.join(parts[5:])
+                        if '/sbin/reboot' in command:
+                            reboot_enabled = True
+                            reboot_time = f"{int(hour):02d}:{int(minute):02d}"
+                        elif '/sbin/poweroff' in command:
+                            shutdown_enabled = True
+                            shutdown_time = f"{int(hour):02d}:{int(minute):02d}"
+            else:
+                # Also check the systemd reboot timer
+                try:
+                    result = self.main_window.sudo_handler.run_command(
+                        ['systemctl', 'is-active', 'scc-reboot.timer'],
+                        timeout=5
+                    )
+                    if result.returncode == 0:
+                        reboot_enabled = True
+                        import re
+                        show_result = self.main_window.sudo_handler.run_command(
+                            ['systemctl', 'show', 'scc-reboot.timer', '--property=TimersCalendar', '--no-pager'],
+                            timeout=5
+                        )
+                        if show_result.returncode == 0 and show_result.stdout:
+                            match = re.search(r'(\d{2}):(\d{2}):00', show_result.stdout)
+                            if match:
+                                reboot_time = f"{match.group(1)}:{match.group(2)}"
+                except Exception:
+                    pass
+        except Exception as e:
+            self.log(f"Could not read schedule: {e}", "WARNING")
+
+        # Update UI
+        self.reboot_check.setChecked(reboot_enabled)
+        rh, rm = reboot_time.split(':')
+        self.reboot_time.setTime(QTime(int(rh), int(rm)))
+
+        self.shutdown_check.setChecked(shutdown_enabled)
+        sh, sm = shutdown_time.split(':')
+        self.shutdown_time.setTime(QTime(int(sh), int(sm)))
+
+        self.apply_btn.setEnabled(False)
         self.set_status("Schedule loaded", "success")
 
     def apply_schedule(self):

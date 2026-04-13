@@ -171,19 +171,28 @@ class ModernTheme:
         
         /* Checkboxes */
         QCheckBox {
-            spacing: 8px;
+            spacing: 10px;
             color: #e4e4e7;
+            padding: 4px 0px;
         }
         QCheckBox::indicator {
-            width: 18px;
-            height: 18px;
+            width: 20px;
+            height: 20px;
             border: 2px solid #52525b;
-            border-radius: 4px;
+            border-radius: 5px;
             background: #18181b;
+        }
+        QCheckBox::indicator:hover {
+            border-color: #6366f1;
+            background: #27272a;
         }
         QCheckBox::indicator:checked {
             background: #6366f1;
             border-color: #6366f1;
+        }
+        QCheckBox::indicator:checked:hover {
+            background: #4f46e5;
+            border-color: #4f46e5;
         }
         
         /* Progress Bar */

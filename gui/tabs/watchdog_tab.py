@@ -75,14 +75,33 @@ class WatchdogTab(BaseTab):
         """Update watchdog status display."""
         status = self.watchdog_manager.get_service_status()
         if status.get('active', False) and status.get('enabled', False):
-            self.watchdog_status_label.setText("Status: ▶️ ACTIVE (systemd)")
-            self.watchdog_status_label.setStyleSheet("padding: 10px; color: #22c55e; font-weight: bold;")
+            status_text = "Status: ▶️ ACTIVE (systemd)"
+            status_style = "padding: 10px; color: #22c55e; font-weight: bold;"
         elif status.get('enabled', False):
-            self.watchdog_status_label.setText("Status: ⚠️ ENABLED BUT INACTIVE")
-            self.watchdog_status_label.setStyleSheet("padding: 10px; color: #eab308; font-weight: bold;")
+            status_text = "Status: ⚠️ ENABLED BUT INACTIVE"
+            status_style = "padding: 10px; color: #eab308; font-weight: bold;"
         else:
-            self.watchdog_status_label.setText("Status: ⏸️ PAUSED")
-            self.watchdog_status_label.setStyleSheet("padding: 10px; color: #a1a1aa; font-weight: bold;")
+            status_text = "Status: ⏸️ PAUSED"
+            status_style = "padding: 10px; color: #a1a1aa; font-weight: bold;"
+
+        # Deep inspection: renderer processes and memory
+        try:
+            rise_status = self.system_ops.get_rise_player_status()
+            renderer_count = rise_status.get('renderer_count', 0)
+            memory_mb = rise_status.get('memory_usage_mb', 0)
+            renderer_running = rise_status.get('renderer_running', False)
+
+            status_text += f"\n\n"
+            status_text += f"  Renderer Processes:  {'✅' if renderer_running else '❌'} {renderer_count} active\n"
+            if memory_mb > 0:
+                status_text += f"  Renderer Memory:    {memory_mb:.0f} MB\n"
+            status_text += f"  Service Active:     {'✅' if status.get('active') else '❌'}\n"
+            status_text += f"  Service Enabled:    {'✅' if status.get('enabled') else '❌'}"
+        except Exception:
+            pass  # Don't break status display if deep inspection fails
+
+        self.watchdog_status_label.setText(status_text)
+        self.watchdog_status_label.setStyleSheet(status_style)
 
     def enable_watchdog(self):
         """Enable watchdog."""

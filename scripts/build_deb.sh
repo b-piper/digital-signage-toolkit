@@ -193,21 +193,24 @@ dpkg-deb --build "${BUILD_DIR}"
 
 mv "build/${FULL_NAME}.deb" .
 
-# 9. Generate GUI Install Script
-# This uses zenity (pre-installed on Ubuntu GNOME) for a fully graphical install experience.
+# 9. Generate Self-Extracting Installer
+# Creates a SINGLE install.sh file with the .deb embedded inside it.
+# The technician only needs this one file — no separate .deb download required.
+# Uses zenity (pre-installed on Ubuntu GNOME) for a fully graphical install experience.
 # Technician flow: right-click → Properties → Allow Executing → double-click → enter password → done.
-echo "[*] Generating install.sh..."
+echo "[*] Generating self-extracting install.sh..."
+
+# Write the shell script portion of the installer
 cat <<'INSTALL_EOF' > install.sh
 #!/bin/bash
 # ============================================================
-# Digital Signage Toolkit - GUI Installer
+# Digital Signage Toolkit - Self-Extracting Installer
 # ============================================================
+# This file contains the .deb package embedded within it.
 # Double-click this file to install (after marking executable).
 # Or run from terminal: sudo bash install.sh
 # ============================================================
 
-SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
-DEB_FILE=$(ls "$SCRIPT_DIR"/dst-toolkit_*.deb 2>/dev/null | head -1)
 LOG_FILE="/tmp/dst-toolkit-install.log"
 
 # --- Helper: detect if zenity is available for GUI mode ---
@@ -231,11 +234,6 @@ show_info() {
     echo "$1"
 }
 
-# --- Check for .deb file ---
-if [ -z "$DEB_FILE" ]; then
-    show_error "No dst-toolkit_*.deb file found.\n\nPlace this script in the same folder as the .deb file."
-fi
-
 # --- If not root, re-launch with pkexec (GUI password prompt) ---
 if [ "$EUID" -ne 0 ]; then
     if command -v pkexec >/dev/null 2>&1; then
@@ -248,13 +246,30 @@ if [ "$EUID" -ne 0 ]; then
 fi
 
 # --- We are root from here ---
-DEB_NAME=$(basename "$DEB_FILE")
+
+# Extract the embedded .deb package from this script
+ARCHIVE_LINE=$(grep -an '^__DEB_ARCHIVE__$' "$0" | tail -1 | cut -d: -f1)
+if [ -z "$ARCHIVE_LINE" ]; then
+    show_error "Could not find embedded package data.\n\nThis installer file may be corrupted."
+fi
+
+DEB_FILE=$(mktemp /tmp/dst-toolkit_XXXXXX.deb)
+trap "rm -f '$DEB_FILE'" EXIT
+
+tail -n +"$((ARCHIVE_LINE + 1))" "$0" > "$DEB_FILE"
+
+# Verify the extracted file is a valid deb
+if ! dpkg-deb -I "$DEB_FILE" >/dev/null 2>&1; then
+    show_error "Embedded package is not a valid Debian package.\n\nThis installer file may be corrupted."
+fi
+
+DEB_NAME="dst-toolkit.deb"
 
 do_install() {
     echo "# Updating package lists..." ; echo "10"
     apt-get update -qq >> "$LOG_FILE" 2>&1
 
-    echo "# Installing $DEB_NAME and dependencies..." ; echo "40"
+    echo "# Installing Digital Signage Toolkit..." ; echo "40"
     apt-get install -y -qq "$DEB_FILE" >> "$LOG_FILE" 2>&1
     INSTALL_RESULT=$?
 
@@ -301,20 +316,22 @@ else
     # Terminal-only mode
     echo "==========================================="
     echo "   Installing Digital Signage Toolkit"
-    echo "   Package: $DEB_NAME"
     echo "==========================================="
 
-    echo "[1/3] Updating package lists..."
+    echo "[1/4] Extracting embedded package..."
+    echo "       OK — extracted to temp file"
+
+    echo "[2/4] Updating package lists..."
     apt-get update -qq
 
-    echo "[2/3] Installing package and dependencies..."
+    echo "[3/4] Installing package and dependencies..."
     apt-get install -y "$DEB_FILE" || {
-        echo "[2/3] Retrying with dpkg + apt-get -f..."
+        echo "[3/4] Retrying with dpkg + apt-get -f..."
         dpkg -i "$DEB_FILE" || true
         apt-get install -f -y -qq
     }
 
-    echo "[3/3] Verifying installation..."
+    echo "[4/4] Verifying installation..."
     if dpkg -s dst-toolkit >/dev/null 2>&1; then
         echo "==========================================="
         echo "   Installation Complete!"
@@ -329,11 +346,21 @@ else
         exit 1
     fi
 fi
+
+# Exit before the binary payload
+exit 0
+__DEB_ARCHIVE__
 INSTALL_EOF
+
+# Append the actual .deb binary to the end of install.sh
+cat "${FULL_NAME}.deb" >> install.sh
 chmod 755 install.sh
 
+# Show final size info
+INSTALLER_SIZE=$(du -h install.sh | cut -f1)
 echo "==========================================="
-echo "   Build Complete: ${FULL_NAME}.deb "
-echo "   Installer:      install.sh"
+echo "   Build Complete!"
+echo "   Self-extracting installer: install.sh (${INSTALLER_SIZE})"
+echo "   Standalone .deb also available: ${FULL_NAME}.deb"
 echo "==========================================="
 

@@ -3,6 +3,7 @@ import json
 import os
 import subprocess
 import threading
+import time
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from typing import Optional
 
@@ -22,6 +23,8 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
 
         if self.path == '/health' or self.path == '/':
             self._handle_health_check()
+        elif self.path == '/metrics':
+            self._handle_metrics()
         else:
             self.send_response(404)
             self.send_header('Content-Type', 'application/json')
@@ -68,12 +71,73 @@ class HealthCheckHandler(BaseHTTPRequestHandler):
         health = get_health_status()
         status_code = 200 if health.get('healthy', False) else 503
 
+        # Auto-trigger alert if unhealthy
+        if not health.get('healthy', True):
+            _trigger_alert(health)
+
         self.send_response(status_code)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Cache-Control', 'no-cache')
         self.end_headers()
         self.wfile.write(json.dumps(health, indent=2).encode())
 
+    def _handle_metrics(self):
+        """Return Prometheus-compatible metrics."""
+        health = get_health_status()
+        lines = []
+        lines.append('# HELP dst_healthy Whether the kiosk is healthy (1=yes, 0=no)')
+        lines.append('# TYPE dst_healthy gauge')
+        lines.append(f'dst_healthy {1 if health.get("healthy") else 0}')
+        lines.append('')
+
+        checks = health.get('checks', {})
+
+        # Rise Vision
+        rv = checks.get('rise_vision', {})
+        lines.append('# HELP dst_rise_vision_running Whether Rise Vision is running')
+        lines.append('# TYPE dst_rise_vision_running gauge')
+        lines.append(f'dst_rise_vision_running {1 if rv.get("running") else 0}')
+        lines.append('')
+
+        # Disk
+        disk = checks.get('disk', {})
+        lines.append('# HELP dst_disk_usage_percent Disk usage percentage')
+        lines.append('# TYPE dst_disk_usage_percent gauge')
+        lines.append(f'dst_disk_usage_percent {disk.get("percent", 0)}')
+        lines.append('# HELP dst_disk_free_bytes Free disk space in bytes')
+        lines.append('# TYPE dst_disk_free_bytes gauge')
+        lines.append(f'dst_disk_free_bytes {disk.get("free_gb", 0) * 1073741824:.0f}')
+        lines.append('')
+
+        # Memory
+        mem = checks.get('memory', {})
+        lines.append('# HELP dst_memory_usage_percent Memory usage percentage')
+        lines.append('# TYPE dst_memory_usage_percent gauge')
+        lines.append(f'dst_memory_usage_percent {mem.get("percent", 0)}')
+        lines.append('# HELP dst_memory_available_bytes Available memory in bytes')
+        lines.append('# TYPE dst_memory_available_bytes gauge')
+        lines.append(f'dst_memory_available_bytes {mem.get("available_gb", 0) * 1073741824:.0f}')
+        lines.append('')
+
+        # CPU
+        cpu = checks.get('cpu', {})
+        lines.append('# HELP dst_cpu_usage_percent CPU usage percentage')
+        lines.append('# TYPE dst_cpu_usage_percent gauge')
+        lines.append(f'dst_cpu_usage_percent {cpu.get("percent", 0)}')
+        lines.append('')
+
+        # Uptime
+        lines.append('# HELP dst_uptime_seconds System uptime in seconds')
+        lines.append('# TYPE dst_uptime_seconds gauge')
+        lines.append(f'dst_uptime_seconds {health.get("uptime_seconds", 0)}')
+        lines.append('')
+
+        output = '\n'.join(lines) + '\n'
+        self.send_response(200)
+        self.send_header('Content-Type', 'text/plain; version=0.0.4; charset=utf-8')
+        self.send_header('Cache-Control', 'no-cache')
+        self.end_headers()
+        self.wfile.write(output.encode())
 
     def log_message(self, format, *args):
         """Suppress default logging."""
@@ -117,7 +181,42 @@ def get_health_status() -> dict:
     return status
 
 
+# Alert integration --------------------------------------------------------
+_last_alert_time = 0
+_ALERT_COOLDOWN = 600  # 10 minutes between alerts
 
+def _trigger_alert(health: dict) -> None:
+    """Send alert email when health check is unhealthy (with cooldown)."""
+    global _last_alert_time
+    now = time.time()
+    if now - _last_alert_time < _ALERT_COOLDOWN:
+        return  # Still in cooldown
+
+    try:
+        from digital_signage_toolkit.core.alert_manager import AlertManager
+        from digital_signage_toolkit.utils.config import Config
+        config = Config()
+        alert_mgr = AlertManager(config)
+
+        hostname = health.get('hostname', 'unknown')
+        checks = health.get('checks', {})
+        problems = []
+        if not checks.get('rise_vision', {}).get('running', True):
+            problems.append('Rise Vision is NOT running')
+        if checks.get('disk', {}).get('critical', False):
+            problems.append(f'Disk usage critical: {checks["disk"].get("percent", "?")}%')
+        if checks.get('memory', {}).get('critical', False):
+            problems.append(f'Memory usage critical: {checks["memory"].get("percent", "?")}%')
+
+        if problems:
+            subject = f'[DST Alert] {hostname} — Health Check Failed'
+            body = f'Kiosk {hostname} is unhealthy:\n\n'
+            body += '\n'.join(f'  • {p}' for p in problems)
+            body += f'\n\nTimestamp: {time.strftime("%Y-%m-%d %H:%M:%S")}'
+            alert_mgr.send_alert(subject, body)
+            _last_alert_time = now
+    except Exception:
+        pass  # Alert failure should never crash the health server
 
 
 def _get_hostname() -> str:

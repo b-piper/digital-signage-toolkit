@@ -3,7 +3,8 @@ import base64
 
 from digital_signage_toolkit.core.alert_manager import AlertManager
 from digital_signage_toolkit.gui.tabs.base_tab import BaseTab
-from PyQt6.QtWidgets import QCheckBox, QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout
+from digital_signage_toolkit.gui.widgets import StyledCheckBox
+from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QLineEdit, QPushButton, QSpinBox, QVBoxLayout
 
 
 class AlertsTab(BaseTab):
@@ -21,7 +22,7 @@ class AlertsTab(BaseTab):
         smtp_group = QGroupBox("SMTP Server Configuration")
         smtp_layout = QVBoxLayout()
 
-        self.enabled_check = QCheckBox("Enable Email Alerts")
+        self.enabled_check = StyledCheckBox("Enable Email Alerts")
         self.enabled_check.toggled.connect(self._on_change)
         smtp_layout.addWidget(self.enabled_check)
 

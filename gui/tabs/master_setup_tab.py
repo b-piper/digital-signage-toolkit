@@ -1,7 +1,8 @@
 """Master Setup tab for Digital Signage Toolkit."""
 from digital_signage_toolkit.gui.tabs.base_tab import BaseTab
+from digital_signage_toolkit.gui.widgets import StyledCheckBox
 from digital_signage_toolkit.utils.validators import sanitize_hostname, validate_hostname
-from PyQt6.QtWidgets import QCheckBox, QGroupBox, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout
+from PyQt6.QtWidgets import QGroupBox, QLabel, QLineEdit, QProgressBar, QPushButton, QVBoxLayout
 
 
 class MasterSetupTab(BaseTab):
@@ -42,12 +43,12 @@ class MasterSetupTab(BaseTab):
         software_group = QGroupBox("Software Installation")
         software_layout = QVBoxLayout()
 
-        self.install_teamviewer_check = QCheckBox("Install TeamViewer")
+        self.install_teamviewer_check = StyledCheckBox("Install TeamViewer")
         self.install_teamviewer_check.setChecked(True)
         self.install_teamviewer_check.setToolTip("Install TeamViewer for remote access and support")
         software_layout.addWidget(self.install_teamviewer_check)
 
-        self.install_rise_check = QCheckBox("Install Rise Vision Player")
+        self.install_rise_check = StyledCheckBox("Install Rise Vision Player")
         self.install_rise_check.setChecked(True)
         self.install_rise_check.setToolTip("Install Rise Vision Player for digital signage display")
         software_layout.addWidget(self.install_rise_check)

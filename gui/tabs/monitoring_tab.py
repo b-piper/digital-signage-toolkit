@@ -172,6 +172,19 @@ class MonitoringTab(BaseTab):
                self.logger.log_security_event("THERMAL_CRITICAL", f"Critical temp: {max_temp:.1f}")
                self.log(f"⚠️ CRITICAL: Temperature {max_temp:.1f}°C!", "ERROR")
                self._last_thermal_alert_time = datetime.now().timestamp()
+               # Auto-trigger email alert
+               try:
+                   from digital_signage_toolkit.core.alert_manager import AlertManager
+                   alert_mgr = AlertManager(self.main_window.config)
+                   hostname = self.system_ops.get_hostname() or 'unknown'
+                   alert_mgr.send_alert(
+                       f'[DST Alert] {hostname} — Critical Temperature',
+                       f'Kiosk {hostname} has reached critical temperature: {max_temp:.1f}°C ({zone_name or "unknown zone"}).\n'
+                       f'Threshold: 85.0°C\n'
+                       f'Timestamp: {datetime.now().strftime("%Y-%m-%d %H:%M:%S")}'
+                   )
+               except Exception:
+                   pass  # Alert failure should not crash monitoring
 
         # Display resolution
         resolution = self.system_ops.get_display_resolution()

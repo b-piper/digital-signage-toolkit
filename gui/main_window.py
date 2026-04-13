@@ -1,4 +1,6 @@
 """Main GUI window."""
+import os
+
 import qtawesome as qta
 from digital_signage_toolkit.core.hardware_monitor import HardwareMonitor
 from digital_signage_toolkit.core.software_installer import SoftwareInstaller
@@ -56,6 +58,9 @@ class WorkerThread(QThread):
 class MainWindow(QMainWindow):
     """Main application window."""
 
+    # Section headers are stored here — they occupy list positions but are not clickable
+    SECTION_HEADER_ROLE = Qt.ItemDataRole.UserRole + 1
+
     def __init__(self):
         super().__init__()
         self.config = Config()
@@ -69,6 +74,10 @@ class MainWindow(QMainWindow):
 
         self.current_worker = None
         self.settings = QSettings('SouthwesternCC', 'DigitalSignageToolkit')
+
+        # Map from nav_list row index → page_stack index (skipping section headers)
+        self._row_to_page = {}
+
         self.init_ui()
         self._setup_keyboard_shortcuts()
         self._restore_window_state()
@@ -102,9 +111,16 @@ class MainWindow(QMainWindow):
             shortcut.activated.connect(lambda idx=i: self._switch_to_tab(idx))
 
     def _switch_to_tab(self, index: int):
-        """Switch to tab at given index (if valid)."""
-        if 0 <= index < self.nav_list.count():
-            self.nav_list.setCurrentRow(index)
+        """Switch to tab at given index (if valid, skipping headers)."""
+        # Find the Nth actual tab (not header) and select it
+        tab_count = 0
+        for row in range(self.nav_list.count()):
+            item = self.nav_list.item(row)
+            if item and not item.data(self.SECTION_HEADER_ROLE):
+                if tab_count == index:
+                    self.nav_list.setCurrentRow(row)
+                    return
+                tab_count += 1
 
     def _save_window_state(self):
         """Save window geometry and state to settings."""
@@ -141,18 +157,28 @@ class MainWindow(QMainWindow):
         sidebar_widget.setStyleSheet("background-color: #18181b; border-right: 1px solid #27272a;")
         sidebar_layout = QVBoxLayout(sidebar_widget)
         sidebar_layout.setContentsMargins(0, 0, 0, 0)
-        sidebar_layout.setSpacing(10)
+        sidebar_layout.setSpacing(0)
 
-        # App Title / Logo Area
+        # App Title / Logo Area with version
         title_frame = QFrame()
-        title_frame.setFixedHeight(80)
+        title_frame.setFixedHeight(90)
         title_frame.setStyleSheet("background-color: #18181b; border-bottom: 1px solid #27272a;")
         title_layout = QVBoxLayout(title_frame)
+        title_layout.setSpacing(2)
+
         title_label = QLabel("Digital Signage\nToolkit")
         title_label.setFont(QFont("Segoe UI", 16, QFont.Weight.Bold))
         title_label.setStyleSheet("color: #f4f4f5; border: none;")
         title_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
         title_layout.addWidget(title_label)
+
+        # Version display
+        version = self._get_version()
+        version_label = QLabel(f"v{version}")
+        version_label.setStyleSheet("color: #52525b; font-size: 11px; border: none;")
+        version_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        title_layout.addWidget(version_label)
+
         sidebar_layout.addWidget(title_frame)
 
         # Navigation List
@@ -161,15 +187,46 @@ class MainWindow(QMainWindow):
         self.nav_list.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.nav_list.currentRowChanged.connect(self.switch_tab)
 
-        # Add Navigation Items
-        self.add_nav_item("Master Setup", "fa5s.rocket")
-        self.add_nav_item("OS Upgrade", "fa5s.arrow-circle-up")
-        self.add_nav_item("Watchdog", "fa5s.shield-alt")
-        self.add_nav_item("System Restore", "fa5s.history")
-        self.add_nav_item("Scheduler", "fa5s.clock")
-        self.add_nav_item("Alerts", "fa5s.bell")
-        self.add_nav_item("Monitoring", "fa5s.chart-line")
-        self.add_nav_item("Logs", "fa5s.file-alt")
+        # ── Build grouped navigation ──
+        page_index = 0
+
+        # Dashboard (no section header — it's the top-level entry)
+        self._add_nav_item("Dashboard", "fa5s.th-large", page_index)
+        page_index += 1
+
+        # ── INITIAL SETUP ──
+        self._add_section_header("INITIAL SETUP")
+        self._add_nav_item("Master Setup", "fa5s.rocket", page_index)
+        page_index += 1
+        self._add_nav_item("OS Upgrade", "fa5s.arrow-circle-up", page_index)
+        page_index += 1
+
+        # ── MANAGEMENT ──
+        self._add_section_header("MANAGEMENT")
+        self._add_nav_item("Watchdog", "fa5s.shield-alt", page_index)
+        page_index += 1
+        self._add_nav_item("Rise Vision", "fa5s.tv", page_index)
+        page_index += 1
+        self._add_nav_item("Scheduler", "fa5s.clock", page_index)
+        page_index += 1
+        self._add_nav_item("Alerts", "fa5s.bell", page_index)
+        page_index += 1
+        self._add_nav_item("Settings", "fa5s.cog", page_index)
+        page_index += 1
+
+        # ── DIAGNOSTICS ──
+        self._add_section_header("DIAGNOSTICS")
+        self._add_nav_item("Monitoring", "fa5s.chart-line", page_index)
+        page_index += 1
+        self._add_nav_item("Logs", "fa5s.file-alt", page_index)
+        page_index += 1
+
+        # ── MAINTENANCE ──
+        self._add_section_header("MAINTENANCE")
+        self._add_nav_item("System Restore", "fa5s.history", page_index)
+        page_index += 1
+        self._add_nav_item("Disk Cleanup", "fa5s.broom", page_index)
+        page_index += 1
 
         sidebar_layout.addWidget(self.nav_list)
 
@@ -263,73 +320,145 @@ class MainWindow(QMainWindow):
 
         host_layout.addWidget(content_widget)
 
-        # Select first item
+        # Select first item (Dashboard)
         self.nav_list.setCurrentRow(0)
 
-    def add_nav_item(self, text, icon_name):
-        """Add item to navigation list."""
+    def _add_section_header(self, text):
+        """Add a non-clickable section header to the navigation list."""
         item = QListWidgetItem(text)
-        item.setIcon(qta.icon(icon_name, color="#a1a1aa"))
-        item.setData(Qt.ItemDataRole.UserRole, icon_name) # Store icon name
+        item.setFlags(Qt.ItemFlag.NoItemFlags)  # Non-selectable, non-clickable
+        item.setData(self.SECTION_HEADER_ROLE, True)
+        item.setData(Qt.ItemDataRole.UserRole, None)  # No icon name
+
+        # Style: uppercase, smaller, dimmed, with top padding
+        font = QFont("Segoe UI", 9, QFont.Weight.Bold)
+        item.setFont(font)
+        item.setForeground(qta.icon('fa5s.circle', color='#52525b').pixmap(1, 1).toImage().pixelColor(0, 0))
+        # Use a QBrush for the text color
+        from PyQt6.QtGui import QBrush, QColor
+        item.setForeground(QBrush(QColor("#52525b")))
+
+        # Add vertical spacing via size hint
+        from PyQt6.QtCore import QSize
+        item.setSizeHint(QSize(0, 32))
+
         self.nav_list.addItem(item)
 
-    def switch_tab(self, index):
+    def _add_nav_item(self, text, icon_name, page_index):
+        """Add a clickable navigation item to the list."""
+        item = QListWidgetItem(text)
+        item.setIcon(qta.icon(icon_name, color="#a1a1aa"))
+        item.setData(Qt.ItemDataRole.UserRole, icon_name)  # Store icon name
+        item.setData(self.SECTION_HEADER_ROLE, False)
+        self.nav_list.addItem(item)
+
+        # Map this row to the page stack index
+        row = self.nav_list.count() - 1
+        self._row_to_page[row] = page_index
+
+    def switch_tab(self, row):
         """Switch stacked widget page based on list selection."""
-        self.page_stack.setCurrentIndex(index)
+        if row < 0:
+            return
+
+        item = self.nav_list.item(row)
+        if not item:
+            return
+
+        # If a section header was somehow selected, skip to next real item
+        if item.data(self.SECTION_HEADER_ROLE):
+            # Find next selectable item
+            for next_row in range(row + 1, self.nav_list.count()):
+                next_item = self.nav_list.item(next_row)
+                if next_item and not next_item.data(self.SECTION_HEADER_ROLE):
+                    self.nav_list.setCurrentRow(next_row)
+                    return
+            return
+
+        # Map to actual page
+        page_index = self._row_to_page.get(row, 0)
+        self.page_stack.setCurrentIndex(page_index)
 
         # Update page title
-        item = self.nav_list.item(index)
-        if item:
-            self.page_title.setText(item.text())
+        self.page_title.setText(item.text())
 
-            # Update icon selection state
-            for i in range(self.nav_list.count()):
-                it = self.nav_list.item(i)
-                icon_name = it.data(Qt.ItemDataRole.UserRole)
-                if i == index:
-                    # Active color
-                    it.setIcon(qta.icon(icon_name, color="#6366f1"))
-                else:
-                    # Inactive color
-                    it.setIcon(qta.icon(icon_name, color="#a1a1aa"))
+        # Update icon selection state
+        for i in range(self.nav_list.count()):
+            it = self.nav_list.item(i)
+            if it.data(self.SECTION_HEADER_ROLE):
+                continue
+            icon_name = it.data(Qt.ItemDataRole.UserRole)
+            if not icon_name:
+                continue
+            if i == row:
+                it.setIcon(qta.icon(icon_name, color="#6366f1"))
+            else:
+                it.setIcon(qta.icon(icon_name, color="#a1a1aa"))
 
-            # Special logic for hardware monitoring updates
-            # Tab 6 is Monitoring (0=Master,1=OS,2=Watchdog,3=Restore,4=Sched,5=Alerts,6=Monitor,7=Logs)
-            if index == 6:
-                self.monitoring_tab.update_monitoring_info()
+        # Refresh data on tab switch
+        if page_index == self._get_page_index("monitoring"):
+            self.monitoring_tab.update_monitoring_info()
+        elif page_index == self._get_page_index("dashboard"):
+            self.dashboard_tab.refresh_status()
+        elif page_index == self._get_page_index("watchdog"):
+            self.watchdog_tab.update_watchdog_status()
+
+    def _get_page_index(self, tab_name):
+        """Get the page stack index for a named tab."""
+        tab_order = [
+            "dashboard", "master_setup", "os_upgrade",
+            "watchdog", "rise_vision", "scheduler", "alerts", "config",
+            "monitoring", "logs",
+            "restore", "disk_cleanup"
+        ]
+        try:
+            return tab_order.index(tab_name)
+        except ValueError:
+            return -1
 
     def _create_tabs(self):
-        """Create all tabs and add to stack."""
+        """Create all tabs and add to stack in the correct order."""
         from digital_signage_toolkit.gui.tabs import (
+            ConfigTab,
+            DashboardTab,
+            DiskCleanupTab,
             LogViewerTab,
             MasterSetupTab,
             MonitoringTab,
             OSUpgradeTab,
             RestoreTab,
+            RiseVisionTab,
             SchedulerTab,
             WatchdogTab,
         )
 
-        # Create tab instances
-        self.master_setup_tab = MasterSetupTab(self)
-        self.os_upgrade_tab = OSUpgradeTab(self)
-        self.watchdog_tab = WatchdogTab(self)
-        self.restore_tab = RestoreTab(self)
-        self.scheduler_tab = SchedulerTab(self)
-        self.monitoring_tab = MonitoringTab(self)
-        self.log_viewer_tab = LogViewerTab(self)
-        self.alerts_tab = AlertsTab(self)
+        # Create tab instances — order must match nav_list page_index ordering
+        self.dashboard_tab = DashboardTab(self)       # 0
+        self.master_setup_tab = MasterSetupTab(self)   # 1
+        self.os_upgrade_tab = OSUpgradeTab(self)       # 2
+        self.watchdog_tab = WatchdogTab(self)           # 3
+        self.rise_vision_tab = RiseVisionTab(self)     # 4
+        self.scheduler_tab = SchedulerTab(self)         # 5
+        self.alerts_tab = AlertsTab(self)               # 6
+        self.config_tab = ConfigTab(self)               # 7
+        self.monitoring_tab = MonitoringTab(self)       # 8
+        self.log_viewer_tab = LogViewerTab(self)       # 9
+        self.restore_tab = RestoreTab(self)             # 10
+        self.disk_cleanup_tab = DiskCleanupTab(self)   # 11
 
-        # Add tabs to stacked widget
-        self.page_stack.addWidget(self.master_setup_tab)
-        self.page_stack.addWidget(self.os_upgrade_tab)
-        self.page_stack.addWidget(self.watchdog_tab)
-        self.page_stack.addWidget(self.restore_tab)
-        self.page_stack.addWidget(self.scheduler_tab)
-        self.page_stack.addWidget(self.alerts_tab)
-        self.page_stack.addWidget(self.monitoring_tab)
-        self.page_stack.addWidget(self.log_viewer_tab)
-        # Add tabs to stacked widget
+        # Add to stacked widget in the same order
+        self.page_stack.addWidget(self.dashboard_tab)      # 0
+        self.page_stack.addWidget(self.master_setup_tab)    # 1
+        self.page_stack.addWidget(self.os_upgrade_tab)      # 2
+        self.page_stack.addWidget(self.watchdog_tab)        # 3
+        self.page_stack.addWidget(self.rise_vision_tab)     # 4
+        self.page_stack.addWidget(self.scheduler_tab)       # 5
+        self.page_stack.addWidget(self.alerts_tab)          # 6
+        self.page_stack.addWidget(self.config_tab)          # 7
+        self.page_stack.addWidget(self.monitoring_tab)      # 8
+        self.page_stack.addWidget(self.log_viewer_tab)      # 9
+        self.page_stack.addWidget(self.restore_tab)         # 10
+        self.page_stack.addWidget(self.disk_cleanup_tab)    # 11
 
     def log(self, message: str, level: str = "INFO"):
         """Log a message to the console."""
@@ -343,9 +472,9 @@ class MainWindow(QMainWindow):
         self.monitor_timer.start(5000)  # Update every 5 seconds
 
     def _update_monitoring(self):
-        """Update monitoring information in the Monitoring tab."""
-        # Only update if monitoring tab is visible (tab index 6)
-        if self.page_stack.currentIndex() == 6 and hasattr(self, 'monitoring_tab'):
+        """Update monitoring information if the Monitoring tab is visible."""
+        monitoring_index = self._get_page_index("monitoring")
+        if self.page_stack.currentIndex() == monitoring_index and hasattr(self, 'monitoring_tab'):
             self.monitoring_tab.update_monitoring_info()
 
     def reboot_system(self):
@@ -384,3 +513,14 @@ class MainWindow(QMainWindow):
         version = self.config.get('version', '2.0.0')
         dialog = ModernAboutDialog(self, version)
         dialog.exec()
+
+    def _get_version(self):
+        """Get the application version."""
+        try:
+            version_file = '/opt/dst-toolkit/VERSION'
+            if os.path.exists(version_file):
+                with open(version_file) as f:
+                    return f.read().strip()
+        except Exception:
+            pass
+        return self.config.get('version', '2.0.0')

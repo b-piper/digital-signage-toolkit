@@ -1,14 +1,26 @@
 # Deployment Guide
 
-## Quick Install
+## Quick Install (Recommended)
 
-One-line installer (recommended):
+Download **`install.sh`** from the [latest release](https://github.com/b-piper/digital-signage-toolkit/releases/latest). This is a self-extracting installer — the `.deb` package is embedded inside it. **No other files needed.**
+
+1. Copy `install.sh` to the kiosk (USB drive, network share, etc.)
+2. Right-click → Properties → "Allow Executing as Program"
+3. Double-click to run (enter password when prompted)
+
+Or from a terminal:
+```bash
+sudo bash install.sh
+```
+
+## Alternative Install Methods
+
+### Remote one-liner (requires internet)
 ```bash
 curl -sSL https://raw.githubusercontent.com/b-piper/digital-signage-toolkit/main/install-remote.sh | sudo bash
 ```
 
-## Manual Install
-
+### Standalone .deb (advanced)
 Download from [Releases](https://github.com/b-piper/digital-signage-toolkit/releases):
 ```bash
 sudo apt install ./dst-toolkit_X.X.X_amd64.deb

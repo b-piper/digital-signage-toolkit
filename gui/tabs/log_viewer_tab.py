@@ -4,10 +4,10 @@ from datetime import datetime
 from pathlib import Path
 
 from digital_signage_toolkit.gui.tabs.base_tab import BaseTab
+from digital_signage_toolkit.gui.widgets import StyledCheckBox
 from PyQt6.QtCore import QTimer
 from PyQt6.QtGui import QFont
 from PyQt6.QtWidgets import (
-    QCheckBox,
     QComboBox,
     QHBoxLayout,
     QLabel,
@@ -76,7 +76,7 @@ class LogViewerTab(BaseTab):
         controls_layout.addWidget(refresh_btn)
 
         # Auto-refresh checkbox
-        self.auto_refresh_check = QCheckBox("Auto-refresh (10s)")
+        self.auto_refresh_check = StyledCheckBox("Auto-refresh (10s)")
 
         self.auto_refresh_check.toggled.connect(self.toggle_auto_refresh)
         controls_layout.addWidget(self.auto_refresh_check)
