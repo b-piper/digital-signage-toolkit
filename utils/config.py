@@ -132,7 +132,7 @@ class Config:
     def _default_config(self) -> Dict[str, Any]:
         """Return default configuration."""
         return {
-            "version": "2.0.0",
+            "version": "2.4.2",
             "urls": {
                 "teamviewer": "https://download.teamviewer.com/download/linux/teamviewer_amd64.deb",
                 "rise_vision": "https://storage.googleapis.com/install-versions.risevision.com/installer-lnx-64.sh"
@@ -238,19 +238,49 @@ class Config:
         return path
 
     @staticmethod
+    def get_real_user() -> str:
+        """Get the real user's username, accounting for sudo and pkexec.
+
+        When running as root, attempts to determine the actual user who invoked it.
+        Returns the username.
+        """
+        if os.geteuid() == 0:
+            sudo_user = os.environ.get('SUDO_USER')
+            if sudo_user:
+                return sudo_user
+
+            pkexec_uid = os.environ.get('PKEXEC_UID')
+            if pkexec_uid:
+                try:
+                    import pwd
+                    return pwd.getpwuid(int(pkexec_uid)).pw_name
+                except (ImportError, KeyError, ValueError):
+                    pass
+
+            # Fallback for root: Try to find the first non-system user
+            try:
+                import pwd
+                for pw in pwd.getpwall():
+                    if pw.pw_uid >= 1000 and pw.pw_shell not in ('/usr/sbin/nologin', '/bin/false'):
+                        return pw.pw_name
+            except ImportError:
+                pass
+
+        return os.environ.get('USER', 'root')
+
+    @staticmethod
     def get_real_user_home() -> str:
         """Get the real user's home directory.
 
         When running as root via sudo/pkexec, returns the home directory
-        of the actual user (SUDO_USER), not /root.
+        of the actual user, not /root.
         """
-        sudo_user = os.environ.get('SUDO_USER', '')
-        if sudo_user and os.geteuid() == 0:
-            # Running as root via sudo — use the original user's home
+        real_user = Config.get_real_user()
+        if real_user and real_user != 'root':
             try:
                 import pwd
-                return pwd.getpwnam(sudo_user).pw_dir
+                return pwd.getpwnam(real_user).pw_dir
             except (ImportError, KeyError):
-                return f'/home/{sudo_user}'
+                return f'/home/{real_user}'
         return os.path.expanduser('~')
 

@@ -46,11 +46,14 @@ class SudoHandler:
 
     def run_command(self, command: list[str], capture_output: bool = True,
                    timeout: Optional[int] = None, env: Optional[dict] = None,
-                   operation_name: Optional[str] = None) -> subprocess.CompletedProcess:
+                   operation_name: Optional[str] = None,
+                   allowed_exit_codes: Optional[list[int]] = None) -> subprocess.CompletedProcess:
         """Run a command as root."""
         sudo_cmd = command
         op_name = operation_name or ' '.join(command[:2])  # First 2 args for logging
         safe_command = self._sanitize_command_for_logging(command)
+        
+        allowed_codes = [0] if allowed_exit_codes is None else allowed_exit_codes
 
         self.logger.log_operation(
             f"SUDO_COMMAND: {op_name}",
@@ -68,7 +71,7 @@ class SudoHandler:
                 env=env
             )
 
-            if result.returncode != 0:
+            if result.returncode not in allowed_codes:
                 self.logger.log_operation(
                     f"SUDO_COMMAND: {op_name}",
                     self._current_user,

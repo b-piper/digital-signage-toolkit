@@ -173,9 +173,12 @@ def main():
 
     # Create application
     from PyQt6.QtWidgets import QApplication
+    from PyQt6.QtGui import QGuiApplication
+    
     app = QApplication(sys.argv)
     app.setApplicationName("Digital Signage Toolkit")
     app.setOrganizationName("Southwestern CC")
+    QGuiApplication.setDesktopFileName("digital-signage-toolkit.desktop")
 
     # Set dark theme style
     app.setStyle('Fusion')

@@ -22,8 +22,8 @@ class WatchdogManager:
         self.player_startup = config.expand_path('paths.player_startup')
         self.service_name = config.get('watchdog.service_name', 'rise-vision-player')
         self.service_file = Path(config.get('watchdog.service_file', f'/etc/systemd/system/{self.service_name}.service'))
-        # Use the real user (SUDO_USER), not root
-        self.current_user = os.environ.get('SUDO_USER', os.environ.get('USER', 'root'))
+        # Use the real user, not root
+        self.current_user = Config.get_real_user()
         self.current_home = config.get_real_user_home()
         self.logger = get_logger()
         self._service_creation_lock = threading.Lock()  # Prevent race conditions
@@ -39,7 +39,8 @@ class WatchdogManager:
         # Check if service is enabled
         result = self.sudo.run_command(
             ['systemctl', 'is-enabled', self.service_name],
-            timeout=5
+            timeout=5,
+            allowed_exit_codes=[0, 1] # 1 means disabled
         )
         if result.returncode != 0:
             return False
@@ -47,7 +48,8 @@ class WatchdogManager:
         # Check if service is active
         result = self.sudo.run_command(
             ['systemctl', 'is-active', self.service_name],
-            timeout=5
+            timeout=5,
+            allowed_exit_codes=[0, 3] # 3 means inactive
         )
         return result.returncode == 0
 
@@ -58,8 +60,11 @@ class WatchdogManager:
             Tuple of (is_valid, resolved_path)
         """
         try:
-            # Expand and resolve path
-            player_path = Path(self.player_startup).expanduser().resolve()
+            # Expand and resolve path using the real user's home directory if needed
+            startup_path_str = self.player_startup
+            if startup_path_str.startswith('~'):
+                startup_path_str = startup_path_str.replace('~', self.current_home, 1)
+            player_path = Path(startup_path_str).expanduser().resolve()
 
             # Validate path doesn't contain shell metacharacters
             if not validate_script_path(str(player_path)):
@@ -291,7 +296,8 @@ WantedBy=graphical.target
         result = self.sudo.run_command(
             ['systemctl', 'show', self.service_name,
              '--property=ActiveState,UnitFileState', '--no-pager'],
-            timeout=10
+            timeout=10,
+            allowed_exit_codes=[0, 3, 4]
         )
 
         if result.returncode == 0:
@@ -301,7 +307,8 @@ WantedBy=graphical.target
             # Get full status for output
             status_result = self.sudo.run_command(
                 ['systemctl', 'status', self.service_name, '--no-pager', '-l'],
-                timeout=10
+                timeout=10,
+                allowed_exit_codes=[0, 3, 4]
             )
 
             return {
@@ -317,7 +324,8 @@ WantedBy=graphical.target
         """Stop the Rise Vision player."""
         self.sudo.run_command(
             ['pkill', '-f', 'rvplayer'],
-            timeout=10
+            timeout=10,
+            allowed_exit_codes=[0, 1]
         )
         # pkill returns non-zero if no process found, which is OK
         return True

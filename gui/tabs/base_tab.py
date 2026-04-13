@@ -39,7 +39,11 @@ class BaseTab(QWidget):
     def _on_progress(self, value: int):
         """Handle progress signal on main thread."""
         if hasattr(self, 'progress') and isinstance(self.progress, QProgressBar):
-            self.progress.setValue(value)
+            if value < 0:
+                self.progress.setRange(0, 0)
+            else:
+                self.progress.setRange(0, 100)
+                self.progress.setValue(value)
 
     @property
     def config(self):

@@ -13,6 +13,7 @@ from digital_signage_toolkit.utils.error_handling import (
 )
 from digital_signage_toolkit.utils.logger import get_logger
 from digital_signage_toolkit.utils.sudo_handler import SudoHandler
+from digital_signage_toolkit.utils.config import Config
 
 
 class SystemOperations:
@@ -121,7 +122,7 @@ class SystemOperations:
         """Run apt-get update."""
         try:
             result = self.sudo.run_command(
-                ['apt-get', 'update', '-y'],
+                ['apt-get', '-o', 'Dpkg::Lock::Timeout=120', 'update', '-y'],
                 timeout=300
             )
             if result.returncode != 0:
@@ -146,7 +147,7 @@ class SystemOperations:
         """Run apt-get upgrade."""
         try:
             result = self.sudo.run_command(
-                ['apt-get', 'upgrade', '-y'],
+                ['apt-get', '-o', 'Dpkg::Lock::Timeout=120', 'upgrade', '-y'],
                 timeout=1800  # 30 minutes
             )
             if result.returncode != 0:
@@ -171,7 +172,7 @@ class SystemOperations:
         """Run apt-get dist-upgrade."""
         try:
             result = self.sudo.run_command(
-                ['apt-get', 'dist-upgrade', '-y'],
+                ['apt-get', '-o', 'Dpkg::Lock::Timeout=120', 'dist-upgrade', '-y'],
                 timeout=1800
             )
             if result.returncode != 0:
@@ -195,7 +196,7 @@ class SystemOperations:
     def apt_autoremove(self) -> Tuple[bool, str]:
         """Run apt-get autoremove."""
         result = self.sudo.run_command(
-            ['apt-get', 'autoremove', '-y', '--purge'],
+            ['apt-get', '-o', 'Dpkg::Lock::Timeout=120', 'autoremove', '-y', '--purge'],
             timeout=300
         )
         if result.returncode != 0:
@@ -210,7 +211,7 @@ class SystemOperations:
     def install_packages(self, packages: list[str]) -> Tuple[bool, str]:
         """Install packages via apt."""
         result = self.sudo.run_command(
-            ['apt-get', 'install', '-y'] + packages,
+            ['apt-get', '-o', 'Dpkg::Lock::Timeout=120', 'install', '-y'] + packages,
             timeout=600
         )
         if result.returncode != 0:
@@ -225,7 +226,7 @@ class SystemOperations:
     def remove_packages(self, packages: list[str]) -> Tuple[bool, str]:
         """Remove packages via apt."""
         result = self.sudo.run_command(
-            ['apt-get', 'remove', '-y'] + packages,
+            ['apt-get', '-o', 'Dpkg::Lock::Timeout=120', 'remove', '-y'] + packages,
             timeout=300
         )
         if result.returncode != 0:
@@ -784,7 +785,7 @@ APT::Periodic::AutocleanInterval "7";
     def fix_apt_locks(self) -> bool:
         """Remove apt locks and fix dpkg."""
         # Kill apt processes (ignore errors if processes don't exist)
-        self.sudo.run_command(['killall', 'apt', 'apt-get', 'dpkg'], timeout=5)
+        self.sudo.run_command(['killall', 'apt', 'apt-get', 'dpkg'], timeout=5, allowed_exit_codes=[0, 1])
         # killall returns non-zero if no processes found, which is OK
 
         # Remove locks
@@ -871,7 +872,7 @@ APT::Periodic::AutocleanInterval "7";
              pass
 
         env['DISPLAY'] = display
-        env['XAUTHORITY'] = f"/home/{os.environ.get('SUDO_USER', 'rise')}/.Xauthority"
+        env['XAUTHORITY'] = f"{Config.get_real_user_home()}/.Xauthority"
 
         # Ensure directory exists
         Path(output_path).parent.mkdir(parents=True, exist_ok=True)

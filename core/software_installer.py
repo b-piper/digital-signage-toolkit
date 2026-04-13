@@ -103,7 +103,7 @@ class SoftwareInstaller:
 
         try:
             result = self.sudo.run_command(
-                ['apt', 'install', '-y', deb_path],
+                ['apt', '-o', 'Dpkg::Lock::Timeout=120', 'install', '-y', deb_path],
                 timeout=600
             )
 
@@ -227,23 +227,13 @@ class SoftwareInstaller:
             # Ensure dbus-x11 is installed (provides dbus-launch needed by the installer)
             if log_callback:
                 log_callback("Ensuring dbus-x11 is installed (required by Rise Vision installer)...")
-            self.sudo.run_command(['apt-get', 'install', '-y', 'dbus-x11'], timeout=120)
+            self.sudo.run_command(['apt-get', '-o', 'Dpkg::Lock::Timeout=120', 'install', '-y', 'dbus-x11'], timeout=120)
 
             if log_callback:
                 log_callback("Launching Rise Vision installer...")
 
             # Determine the real user to run the installer as
-            sudo_user = os.environ.get('SUDO_USER', '')
-            if not sudo_user:
-                # Fallback: try to find a non-root user
-                try:
-                    import pwd
-                    for pw in pwd.getpwall():
-                        if pw.pw_uid >= 1000 and pw.pw_shell not in ('/usr/sbin/nologin', '/bin/false'):
-                            sudo_user = pw.pw_name
-                            break
-                except Exception:
-                    pass
+            sudo_user = Config.get_real_user()
 
             # Set up environment with display access for the installer
             env = os.environ.copy()

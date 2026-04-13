@@ -25,9 +25,12 @@ def main():
         logger.app_logger.warning("Some features may not work correctly on other platforms.")
 
     # Create application
+    from PyQt6.QtGui import QGuiApplication
+    
     app = QApplication(sys.argv)
     app.setApplicationName("Digital Signage Toolkit")
     app.setOrganizationName("Southwestern CC")
+    QGuiApplication.setDesktopFileName("digital-signage-toolkit.desktop")
 
     # Set dark theme style
     app.setStyle('Fusion')

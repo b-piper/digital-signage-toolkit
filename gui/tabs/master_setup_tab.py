@@ -110,6 +110,7 @@ class MasterSetupTab(BaseTab):
                 self.set_progress(20)
 
                 # Install dependencies
+                self.set_progress(-1)
                 self.log("Installing dependencies...", "COMMAND")
                 success, output = self.system_ops.install_packages(['curl', 'wget', 'unzip', 'unclutter'])
                 if success:
@@ -120,6 +121,7 @@ class MasterSetupTab(BaseTab):
 
                 # System updates
                 if self.system_ops.check_internet():
+                    self.set_progress(-1)
                     self.log("Updating system packages...", "COMMAND")
                     success, output = self.system_ops.apt_update()
                     if success:
@@ -135,6 +137,7 @@ class MasterSetupTab(BaseTab):
 
                 # TeamViewer
                 if self.install_teamviewer_check.isChecked():
+                    self.set_progress(-1)
                     self.log("Installing TeamViewer...", "COMMAND")
                     tv_url = self.config.get('urls.teamviewer')
                     if self.software_installer.install_teamviewer(tv_url, None, self.log):
@@ -150,6 +153,7 @@ class MasterSetupTab(BaseTab):
 
                 # Rise Vision
                 if self.install_rise_check.isChecked():
+                    self.set_progress(-1)
                     self.log("Installing Rise Vision Player...", "COMMAND")
                     rise_url = self.config.get('urls.rise_vision')
 

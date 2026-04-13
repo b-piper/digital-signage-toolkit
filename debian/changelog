@@ -1,3 +1,11 @@
+digital-signage-toolkit (2.4.2-1) unstable; urgency=medium
+
+  * Minor bug fixes and hardening improvements
+  * Fix OS upgrade handler errors
+  * Enhance display detection and checkbox GUI
+
+ -- Southwestern CC IT <it@southwesterncc.edu>  Mon, 13 Apr 2026 16:08:00 -0400
+
 digital-signage-toolkit (2.0.0-1) unstable; urgency=medium
 
   * Initial release of Digital Signage Toolkit GUI application

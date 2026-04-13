@@ -7,6 +7,6 @@ Exec=digital-signage-toolkit
 Icon=digital-signage-toolkit
 Terminal=false
 StartupNotify=true
+StartupWMClass=digital-signage-toolkit
 Categories=System;Settings;Administration;
 Keywords=signage;kiosk;system;administration;rise vision;
-

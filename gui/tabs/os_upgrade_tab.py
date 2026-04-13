@@ -125,6 +125,21 @@ class OSUpgradeTab(BaseTab):
                 self.system_ops.install_packages(['update-manager-core'])
                 self.set_progress(60)
 
+                # Check if upgrade available
+                self.log("Checking for release upgrades...", "COMMAND")
+                check_result = self.sudo_handler.run_command(
+                    ['do-release-upgrade', '-c'],
+                    timeout=60,
+                    allowed_exit_codes=[0, 1]
+                )
+                
+                check_output = (check_result.stdout or '') + (check_result.stderr or '')
+                if check_result.returncode != 0 and 'No new release found' in check_output:
+                    self.log("No OS upgrade available. System is up to date.", "SUCCESS")
+                    self.set_progress(100)
+                    self.set_status("System Up To Date", "success")
+                    return True
+
                 # Run do-release-upgrade
                 self.log("Starting release upgrade (non-interactive)...", "COMMAND")
                 self.log("This may take 30-60 minutes. Please wait...", "WARNING")
