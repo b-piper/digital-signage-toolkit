@@ -39,16 +39,13 @@ jobs:
       uses: actions/upload-artifact@v4
       with:
         name: dst-toolkit-installer
-        path: |
-          install.sh
-          dst-toolkit_*.deb
+        path: install.sh
     
     - name: Create GitHub Release
       uses: softprops/action-gh-release@v1
       with:
-        files: |
-          install.sh
-          dst-toolkit_*.deb
+        files: install.sh
         generate_release_notes: true
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+

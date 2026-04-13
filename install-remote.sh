@@ -76,30 +76,27 @@ if [ "$LATEST" = "$CURRENT" ]; then
     exit 0
 fi
 
-# Get download URL for .deb package
-DEB_URL=$(echo "$RELEASE_JSON" | grep "browser_download_url" | grep "\.deb" | head -1 | cut -d'"' -f4)
-if [ -z "$DEB_URL" ]; then
-    die "No .deb package found in the latest release. Check GitHub releases."
+# Get download URL for the self-extracting installer
+INSTALLER_URL=$(echo "$RELEASE_JSON" | grep "browser_download_url" | grep "install\.sh" | head -1 | cut -d'"' -f4)
+if [ -z "$INSTALLER_URL" ]; then
+    die "No install.sh found in the latest release. Check GitHub releases."
 fi
 
-log "Downloading: ${DEB_URL}..."
+log "Downloading: ${INSTALLER_URL}..."
 
 # Download to temp file
-DEB_FILE=$(mktemp --suffix=.deb)
-trap "rm -f '$DEB_FILE'" EXIT
+INSTALLER_FILE=$(mktemp --suffix=.sh)
+trap "rm -f '$INSTALLER_FILE'" EXIT
 
-curl -sSL --connect-timeout 10 --max-time 300 "$DEB_URL" -o "$DEB_FILE" \
-    || die "Failed to download .deb package."
+curl -sSL --connect-timeout 10 --max-time 300 "$INSTALLER_URL" -o "$INSTALLER_FILE" \
+    || die "Failed to download installer."
 
-# Verify it's a valid deb
-if ! dpkg-deb -I "$DEB_FILE" >/dev/null 2>&1; then
-    die "Downloaded file is not a valid Debian package. It may be corrupted."
-fi
+chmod +x "$INSTALLER_FILE"
 
 log "Installing Digital Signage Toolkit v${LATEST}..."
 
-# Install
-if apt-get install -y "$DEB_FILE" >> "$LOG_FILE" 2>&1; then
+# Run the self-extracting installer (we're already root, so it won't prompt for password)
+if bash "$INSTALLER_FILE" >> "$LOG_FILE" 2>&1; then
     echo "$LATEST" > "$VERSION_FILE"
     log ""
     log "${GREEN}╔═══════════════════════════════════════════════════╗${NC}"
@@ -110,5 +107,6 @@ if apt-get install -y "$DEB_FILE" >> "$LOG_FILE" 2>&1; then
     log "Launch GUI:   ${YELLOW}dst-toolkit${NC}"
     log "Health check: ${YELLOW}curl http://localhost:8080/health${NC}"
 else
-    die "Package installation failed. Check ${LOG_FILE} for details."
+    die "Installation failed. Check ${LOG_FILE} for details."
 fi
+
