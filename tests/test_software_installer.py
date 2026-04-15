@@ -37,6 +37,7 @@ def mock_config():
         'checksums.rise_vision': 'def456'
     }.get(key, default))
     config.expand_path = Mock(side_effect=lambda x: f"/home/user/{x.split('.')[-1]}")
+    config.get_real_user_home = Mock(return_value="/home/user")
     return config
 
 
@@ -223,23 +224,18 @@ class TestInstallTeamViewer:
     @patch.object(SoftwareInstaller, 'is_installed')
     @patch.object(SoftwareInstaller, 'download_file')
     @patch.object(SoftwareInstaller, 'install_deb_package')
-    @patch('os.remove')
-    def test_install_teamviewer_from_url(self, mock_remove, mock_install,
+    def test_install_teamviewer_from_url(self, mock_install,
                                          mock_download, mock_is_installed, installer, mock_config):
         """Test TeamViewer installation from URL."""
         mock_is_installed.return_value = False
         mock_download.return_value = True
         mock_install.return_value = True
 
-        # Mock Path.exists to return True for temp file cleanup check
-        with patch('pathlib.Path.exists', return_value=True):
-            result = installer.install_teamviewer()
+        result = installer.install_teamviewer()
 
         assert result is True
         mock_download.assert_called_once()
         mock_install.assert_called_once()
-        # Temp file should be cleaned up
-        mock_remove.assert_called_once()
 
     @pytest.mark.skipif(not hasattr(__import__('os'), 'statvfs'), reason="Test requires Linux filesystem")
     @patch.object(SoftwareInstaller, 'is_installed')

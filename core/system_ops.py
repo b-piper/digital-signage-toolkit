@@ -773,13 +773,13 @@ APT::Periodic::AutocleanInterval "7";
     @log_operation_errors("GET_SOURCES_BACKUPS", [])
     def get_sources_backups(self) -> list[str]:
         """Get list of sources.list backup files."""
-        result = self.sudo.run_command(
-            ['ls', '/etc/apt/sources.list.backup.*'],
-            timeout=10
-        )
-        if result.returncode == 0:
-            return result.stdout.strip().split('\n') if result.stdout.strip() else []
-        return []
+        try:
+            # /etc/apt is world-readable, so we can use native Python Path globbing instead of sudo ls
+            backups = [str(p) for p in Path('/etc/apt').glob('sources.list.backup.*')]
+            return sorted(backups, reverse=True)
+        except Exception as e:
+            self.logger.log_error(e, "GET_SOURCES_BACKUPS")
+            return []
 
     @log_operation_errors("FIX_APT_LOCKS")
     def fix_apt_locks(self) -> bool:

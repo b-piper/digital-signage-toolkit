@@ -10,7 +10,7 @@ long_description = readme_file.read_text() if readme_file.exists() else ""
 
 setup(
     name="digital-signage-toolkit",
-    version="2.4.2",
+    version="2.4.4",
     description="Professional GUI application for provisioning and maintaining Ubuntu Digital Signage Kiosks",
     long_description=long_description,
     long_description_content_type="text/markdown",

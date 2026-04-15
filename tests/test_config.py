@@ -31,7 +31,7 @@ class TestConfigLoading:
         config = Config(config_path=str(temp_config_file))
 
         # Check some default values
-        assert config.get('version') == '2.4.2'
+        assert config.get('version') == '2.4.4'
         assert config.get('urls.teamviewer') is not None
         assert config.get('network.timeout') == 30
         assert config.get('security.verify_checksums') is True
@@ -39,7 +39,7 @@ class TestConfigLoading:
     def test_load_from_file(self, temp_config_file):
         """Test loading config from JSON file."""
         test_config = {
-            'version': '2.4.2',
+            'version': '2.4.4',
             'network': {
                 'timeout': 60,
                 'proxy': 'http://proxy.example.com:8080'
@@ -51,7 +51,7 @@ class TestConfigLoading:
 
         config = Config(config_path=str(temp_config_file))
 
-        assert config.get('version') == '2.4.2'
+        assert config.get('version') == '2.4.4'
         assert config.get('network.timeout') == 60
         assert config.get('network.proxy') == 'http://proxy.example.com:8080'
 
@@ -62,7 +62,7 @@ class TestConfigLoading:
         config = Config(config_path=str(temp_config_file))
 
         # Should fall back to defaults
-        assert config.get('version') == '2.4.2'
+        assert config.get('version') == '2.4.4'
 
     def test_load_missing_file(self, temp_config_file):
         """Test loading when config file doesn't exist."""
@@ -70,7 +70,7 @@ class TestConfigLoading:
         config = Config(config_path=str(temp_config_file))
 
         # Should use defaults
-        assert config.get('version') == '2.4.2'
+        assert config.get('version') == '2.4.4'
 
 
 class TestConfigGet:
@@ -80,7 +80,7 @@ class TestConfigGet:
         """Test getting top-level config values."""
         config = Config(config_path=str(temp_config_file))
 
-        assert config.get('version') == '2.4.2'
+        assert config.get('version') == '2.4.4'
 
     def test_get_nested(self, temp_config_file):
         """Test getting nested config values using dot notation."""

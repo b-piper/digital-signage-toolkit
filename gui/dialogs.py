@@ -8,7 +8,7 @@ import qtawesome as qta
 class ModernAboutDialog(QDialog):
     """Modern styled About dialog."""
 
-    def __init__(self, parent=None, version="2.4.2"):
+    def __init__(self, parent=None, version="2.4.4"):
         super().__init__(parent)
         self.version = version
         self.setup_ui()

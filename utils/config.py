@@ -132,7 +132,7 @@ class Config:
     def _default_config(self) -> Dict[str, Any]:
         """Return default configuration."""
         return {
-            "version": "2.4.2",
+            "version": "2.4.4",
             "urls": {
                 "teamviewer": "https://download.teamviewer.com/download/linux/teamviewer_amd64.deb",
                 "rise_vision": "https://storage.googleapis.com/install-versions.risevision.com/installer-lnx-64.sh"
@@ -244,7 +244,7 @@ class Config:
         When running as root, attempts to determine the actual user who invoked it.
         Returns the username.
         """
-        if os.geteuid() == 0:
+        if hasattr(os, 'geteuid') and os.geteuid() == 0:
             sudo_user = os.environ.get('SUDO_USER')
             if sudo_user:
                 return sudo_user

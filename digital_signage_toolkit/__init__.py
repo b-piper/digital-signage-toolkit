@@ -14,7 +14,7 @@ import importlib
 import sys
 from typing import Iterable
 
-__version__ = "2.4.2"
+__version__ = "2.4.4"
 
 
 def _alias_subpackages(package_names: Iterable[str]) -> None:

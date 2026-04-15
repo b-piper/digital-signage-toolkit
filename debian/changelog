@@ -1,4 +1,4 @@
-digital-signage-toolkit (2.4.2-1) unstable; urgency=medium
+digital-signage-toolkit (2.4.4-1) unstable; urgency=medium
 
   * Minor bug fixes and hardening improvements
   * Fix OS upgrade handler errors

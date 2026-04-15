@@ -30,6 +30,8 @@ def mock_config():
         'paths.player_startup': '~/rvplayer/scripts/start.sh'
     }.get(key, default))
     config.expand_path = Mock(side_effect=lambda x: str(Path.home() / x.replace('~/', '')))
+    config.get_real_user = Mock(return_value="testuser")
+    config.get_real_user_home = Mock(return_value="/home/testuser")
     return config
 
 
@@ -174,15 +176,16 @@ class TestServiceEnableDisable:
     def test_enable_service_creates_if_missing(self, watchdog_manager, mock_sudo_handler):
         """Test that enable creates service file if it doesn't exist."""
         with patch('pathlib.Path.exists', return_value=False):
-            with patch.object(watchdog_manager, 'create_systemd_service', return_value=True):
-                mock_sudo_handler.run_command.side_effect = [
-                    Mock(returncode=0),  # enable
-                    Mock(returncode=0)   # start
-                ]
-
-                result = watchdog_manager.enable()
-
-                assert result is True
+            with patch.object(watchdog_manager, '_validate_player_startup_path', return_value=(True, Path('/tmp/fake'))):
+                with patch.object(watchdog_manager, 'create_systemd_service', return_value=True):
+                    mock_sudo_handler.run_command.side_effect = [
+                        Mock(returncode=0),  # enable
+                        Mock(returncode=0)   # start
+                    ]
+    
+                    result = watchdog_manager.enable()
+    
+                    assert result is True
 
     def test_disable_service_success(self, watchdog_manager, mock_sudo_handler):
         """Test successfully disabling service."""

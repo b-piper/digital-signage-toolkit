@@ -152,13 +152,12 @@ class SoftwareInstaller:
             return self.install_deb_package(local_path, log_callback)
 
         # Download and install
-        temp_deb = '/tmp/teamviewer.deb'
-        if self.download_file(url, temp_deb, expected_checksum=expected_checksum, log_callback=log_callback):
-            success = self.install_deb_package(temp_deb, log_callback)
-            # Cleanup
-            if Path(temp_deb).exists():
-                os.remove(temp_deb)
-            return success
+        import tempfile
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_deb = str(Path(temp_dir) / 'teamviewer.deb')
+            if self.download_file(url, temp_deb, expected_checksum=expected_checksum, log_callback=log_callback):
+                success = self.install_deb_package(temp_deb, log_callback)
+                return success
 
         return False
 
@@ -201,7 +200,9 @@ class SoftwareInstaller:
                     return
         else:
             # Download installer
-            temp_installer = '/tmp/installer-lnx-64.sh'
+            import tempfile
+            self._installer_temp_dir = tempfile.TemporaryDirectory()
+            temp_installer = str(Path(self._installer_temp_dir.name) / 'installer-lnx-64.sh')
             if log_callback:
                 log_callback(f"Downloading Rise Vision installer from {url}...")
             if self.download_file(url, temp_installer, expected_checksum=expected_checksum, log_callback=log_callback):
@@ -249,10 +250,12 @@ class SoftwareInstaller:
 
             try:
                 # Build command — run as the actual user if possible
+                # Passing --force-auto-start=true and --no-sudo to bypass manual CLI prompts
+                installer_args = ['--force-auto-start=true', '--no-sudo']
                 if sudo_user and os.geteuid() == 0:
-                    cmd = ['sudo', '-u', sudo_user, '-E', installer_path]
+                    cmd = ['sudo', '-u', sudo_user, '-E', installer_path] + installer_args
                 else:
-                    cmd = [installer_path]
+                    cmd = [installer_path] + installer_args
 
                 # Run the installer and wait for completion (synchronous)
                 process = subprocess.Popen(
@@ -268,18 +271,43 @@ class SoftwareInstaller:
                     stdout, stderr = process.communicate(timeout=600)  # 10 minute timeout
                     if process.returncode == 0:
                         if log_callback:
-                            log_callback("✅ Rise Vision installer completed successfully")
-                        # Verify installation by checking for startup script
-                        if startup_path.exists():
+                            log_callback("Rise Vision installer script executed, waiting for installation to complete...")
+                        
+                        # Wait for installation by checking for startup script
+                        import time
+                        fallbacks = [
+                            startup_path,
+                            Path(self.config.get_real_user_home()) / 'rvplayer' / 'rvplayer',
+                            Path(self.config.get_real_user_home()) / 'rvplayer' / 'rvplayer.sh',
+                            Path(self.config.get_real_user_home()) / 'RiseVisionPlayer' / 'RiseVisionPlayer'
+                        ]
+                        
+                        # The installer script might fork to background, so we poll for the startup script up to 5 mins
+                        max_wait_seconds = 300
+                        wait_interval = 3
+                        elapsed = 0
+                        found_path = None
+                        
+                        while elapsed < max_wait_seconds:
+                            found_path = next((p for p in fallbacks if p.exists()), None)
+                            if found_path:
+                                break
+                            time.sleep(wait_interval)
+                            elapsed += wait_interval
+                            if log_callback and (elapsed % 15 == 0):
+                                log_callback(f"Still waiting for Rise Vision installation to complete... ({elapsed}s)")
+                        
+                        if found_path:
                             if log_callback:
-                                log_callback("✅ Rise Vision Player startup script found")
+                                log_callback(f"✅ Rise Vision Player startup script found at {found_path}")
+                            if completion_callback:
+                                completion_callback(True)
                         else:
                             if log_callback:
-                                log_callback("⚠️ Installer completed but startup script not yet found")
+                                log_callback("⚠️ Installation timed out waiting for startup script")
                                 log_callback(f"Expected at: {startup_path}")
-                                log_callback("The player may need a reboot to complete setup")
-                        if completion_callback:
-                            completion_callback(True)
+                            if completion_callback:
+                                completion_callback(False)
                     else:
                         error_detail = stderr.strip() if stderr else stdout.strip() if stdout else "Unknown error"
                         if log_callback:
@@ -341,19 +369,20 @@ class SoftwareInstaller:
 
     def clear_rise_cache(self, log_callback: Optional[Callable[[str], None]] = None, aggressive: bool = False) -> bool:
         """Clear Rise Vision Player cache. If aggressive=True, also clears Electron/Chromium caches."""
+        real_home = Path(self.config.get_real_user_home())
         cache_dirs = [
-            Path.home() / '.config' / 'Rise Vision Player' / 'Cache',
-            Path.home() / '.config' / 'Rise Vision Player' / 'GPUCache',
-            Path.home() / '.cache' / 'Rise Vision Player',
+            real_home / '.config' / 'Rise Vision Player' / 'Cache',
+            real_home / '.config' / 'Rise Vision Player' / 'GPUCache',
+            real_home / '.cache' / 'Rise Vision Player',
         ]
 
         # Add aggressive cache clearing locations
         if aggressive:
             cache_dirs.extend([
-                Path.home() / '.config' / 'chromium' / 'Cache',
-                Path.home() / '.cache' / 'chromium',
-                Path.home() / '.config' / 'electron' / 'Cache',
-                Path.home() / '.cache' / 'electron',
+                real_home / '.config' / 'chromium' / 'Cache',
+                real_home / '.cache' / 'chromium',
+                real_home / '.config' / 'electron' / 'Cache',
+                real_home / '.cache' / 'electron',
             ])
 
         cleared_count = 0

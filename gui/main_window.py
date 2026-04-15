@@ -510,7 +510,7 @@ class MainWindow(QMainWindow):
     def show_about_dialog(self):
         """Show about dialog with version information."""
         from digital_signage_toolkit.gui.dialogs import ModernAboutDialog
-        version = self.config.get('version', '2.4.2')
+        version = self.config.get('version', '2.4.4')
         dialog = ModernAboutDialog(self, version)
         dialog.exec()
 
@@ -523,4 +523,4 @@ class MainWindow(QMainWindow):
                     return f.read().strip()
         except Exception:
             pass
-        return self.config.get('version', '2.4.2')
+        return self.config.get('version', '2.4.4')
