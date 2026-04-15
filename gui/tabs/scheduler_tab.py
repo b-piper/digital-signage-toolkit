@@ -126,7 +126,8 @@ class SchedulerTab(BaseTab):
                 try:
                     result = self.main_window.sudo_handler.run_command(
                         ['systemctl', 'is-active', 'scc-reboot.timer'],
-                        timeout=5
+                        timeout=5,
+                        allowed_exit_codes=[0, 3, 4]
                     )
                     if result.returncode == 0:
                         reboot_enabled = True
