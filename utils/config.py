@@ -132,7 +132,7 @@ class Config:
     def _default_config(self) -> Dict[str, Any]:
         """Return default configuration."""
         return {
-            "version": "2.4.4",
+            "version": "2.4.5",
             "urls": {
                 "teamviewer": "https://download.teamviewer.com/download/linux/teamviewer_amd64.deb",
                 "rise_vision": "https://storage.googleapis.com/install-versions.risevision.com/installer-lnx-64.sh"

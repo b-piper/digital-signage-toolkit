@@ -202,6 +202,8 @@ class SoftwareInstaller:
             # Download installer
             import tempfile
             self._installer_temp_dir = tempfile.TemporaryDirectory()
+            # Ensure the temp directory is searchable by the unprivileged user
+            os.chmod(self._installer_temp_dir.name, 0o755)
             temp_installer = str(Path(self._installer_temp_dir.name) / 'installer-lnx-64.sh')
             if log_callback:
                 log_callback(f"Downloading Rise Vision installer from {url}...")

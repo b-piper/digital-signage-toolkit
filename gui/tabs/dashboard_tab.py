@@ -269,7 +269,7 @@ class DashboardTab(BaseTab):
                     return f.read().strip()
         except Exception:
             pass
-        return self.config.get('version', '2.4.4')
+        return self.config.get('version', '2.4.5')
 
     def _check_rise_vision_installed(self):
         """Check if Rise Vision Player files exist."""
