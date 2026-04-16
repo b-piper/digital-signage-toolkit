@@ -42,6 +42,9 @@
     "snapshot_type": "RSYNC",
     "snapshot_location": "/timeshift"
   },
+  "fleet": {
+    "ips": ""
+  },
   "checksums": {
     "teamviewer": "",
     "rise_vision": ""

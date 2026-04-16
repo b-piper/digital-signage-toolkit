@@ -1,12 +1,9 @@
 """Tests for SecretsManager."""
-import json
-import os
-from pathlib import Path
-from unittest.mock import Mock, patch
 
 import pytest
-from cryptography.fernet import Fernet
+
 from digital_signage_toolkit.utils.secrets_manager import SecretsManager
+
 
 @pytest.fixture
 def temp_secrets_path(tmp_path):
@@ -33,11 +30,11 @@ class TestSecretsManager:
         # Test setting a secret
         success = secrets_manager.set_secret('test_key', 'test_value')
         assert success is True
-        
+
         # Test getting real value
         value = secrets_manager.get_secret('test_key')
         assert value == 'test_value'
-        
+
         # Test getting default for missing real value
         default_value = secrets_manager.get_secret('missing_key', 'default')
         assert default_value == 'default'
@@ -51,7 +48,7 @@ class TestSecretsManager:
     def test_load_empty_or_missing(self, secrets_manager):
         """Test loading from a missing or empty file."""
         assert secrets_manager._load_secrets() == {}
-        
+
         # Create empty file
         secrets_manager.secrets_path.touch()
         assert secrets_manager._load_secrets() == {}

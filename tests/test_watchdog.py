@@ -6,6 +6,7 @@ from pathlib import Path
 from unittest.mock import MagicMock, Mock, patch
 
 import pytest
+
 from digital_signage_toolkit.core.watchdog import WatchdogManager
 from digital_signage_toolkit.utils.config import Config
 from digital_signage_toolkit.utils.sudo_handler import SudoHandler
@@ -182,9 +183,9 @@ class TestServiceEnableDisable:
                         Mock(returncode=0),  # enable
                         Mock(returncode=0)   # start
                     ]
-    
+
                     result = watchdog_manager.enable()
-    
+
                     assert result is True
 
     def test_disable_service_success(self, watchdog_manager, mock_sudo_handler):

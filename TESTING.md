@@ -1,6 +1,6 @@
 # Digital Signage Toolkit - comprehensive Test Plan
 
-Use this guide to validate the Digital Signage Toolkit v2.2.1+ on a test device (e.g., Ubuntu VM).
+Use this guide to validate the Digital Signage Toolkit v2.4.6+ on a test device (e.g., Ubuntu VM).
 
 ## 1. Installation & Setup
 
@@ -11,7 +11,7 @@ Use this guide to validate the Digital Signage Toolkit v2.2.1+ on a test device 
     curl -sSL https://raw.githubusercontent.com/b-piper/digital-signage-toolkit/main/install-remote.sh | sudo bash
     ```
     *   **Pass Criteria:** Script completes without errors.
-    *   **Check:** `dpkg -l dst-toolkit` shows version `2.2.1` (or latest).
+    *   **Check:** `dpkg -l dst-toolkit` shows version `2.4.6` (or latest).
 
 2.  **Verify Files:**
     ```bash

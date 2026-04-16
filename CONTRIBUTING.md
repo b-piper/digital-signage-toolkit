@@ -71,13 +71,14 @@ pytest tests/ -v --cov=digital_signage_toolkit --cov-report=html
 ## Project Structure
 
 ```
-core/           # Business logic (system ops, installers, watchdog)
-gui/            # PyQt6 GUI components
-gui/tabs/       # Individual tab widgets
-utils/          # Utilities (config, logging, validation)
-tests/          # Unit tests
-scripts/        # Build and install scripts
-debian/         # Debian packaging
+digital_signage_toolkit/
++-- core/           # Business logic (system ops, installers, watchdog)
++-- gui/            # PyQt6 GUI components & tabs
++-- utils/          # Utilities (config, logging, validation)
++-- monitoring/     # Ansible and Zabbix files
+tests/              # Unit tests
+scripts/            # Build and install scripts
+debian/             # Debian packaging
 ```
 
 ## Environment Variables

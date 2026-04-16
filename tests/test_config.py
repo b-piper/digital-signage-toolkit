@@ -5,6 +5,7 @@ import tempfile
 from pathlib import Path
 
 import pytest
+
 from digital_signage_toolkit.utils.config import Config
 
 

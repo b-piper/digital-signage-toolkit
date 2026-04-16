@@ -2,6 +2,8 @@ include README.md
 include QUICKSTART.md
 include config.json
 include requirements.txt
+recursive-include digital_signage_toolkit/branding *
+recursive-include digital_signage_toolkit/monitoring *
 recursive-include debian *.desktop *.png
 global-exclude __pycache__
 global-exclude *.py[co]

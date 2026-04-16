@@ -180,8 +180,8 @@ chmod 755 "${BUILD_DIR}/usr/bin/${PKG_NAME}"
 
 # 7. Icon Handling
 echo "[*] Installing application icon..."
-if [ -f "branding/SCC Digital Signage Toolkit.png" ]; then
-    cp "branding/SCC Digital Signage Toolkit.png" "${BUILD_DIR}/usr/share/icons/hicolor/256x256/apps/${PKG_NAME}.png"
+if [ -f "digital_signage_toolkit/branding/SCC Digital Signage Toolkit.png" ]; then
+    cp "digital_signage_toolkit/branding/SCC Digital Signage Toolkit.png" "${BUILD_DIR}/usr/share/icons/hicolor/256x256/apps/${PKG_NAME}.png"
     echo "    Icon installed from branding folder"
 else
     echo "    WARNING: Icon not found in branding folder"
@@ -238,7 +238,7 @@ show_info() {
 if [ "$EUID" -ne 0 ]; then
     if command -v pkexec >/dev/null 2>&1; then
         # pkexec runs the script as root with a GUI password dialog
-        pkexec bash "$0" "$@"
+        pkexec env DISPLAY="$DISPLAY" XAUTHORITY="${XAUTHORITY:-$HOME/.Xauthority}" bash "$0" "$@"
         exit $?
     else
         show_error "This installer must be run as root.\n\nOpen a terminal and run:\n  sudo bash install.sh"
@@ -307,7 +307,8 @@ if $HAS_ZENITY; then
             --width=400 2>/dev/null
             
         # Launch the application dynamically in the background
-        nohup /usr/bin/dst-toolkit-gui >/dev/null 2>&1 &
+        export DISPLAY="${DISPLAY:-:0}"
+        nohup /opt/dst-toolkit/venv/bin/python /opt/dst-toolkit/main.py >/dev/null 2>&1 &
     else
         zenity --error \
             --title="Installation Failed" \
@@ -342,7 +343,8 @@ else
         echo "==========================================="
         
         # Launch the application dynamically in the background
-        nohup /usr/bin/dst-toolkit-gui >/dev/null 2>&1 &
+        export DISPLAY="${DISPLAY:-:0}"
+        nohup /opt/dst-toolkit/venv/bin/python /opt/dst-toolkit/main.py >/dev/null 2>&1 &
     else
         echo "==========================================="
         echo "   Installation FAILED"

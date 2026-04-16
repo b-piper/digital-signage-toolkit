@@ -2,7 +2,7 @@
 
 Use this guide to verify the **Application Features** of the Digital Signage Toolkit.
 
-## 1. System Operations (Fixed in v2.2.5)
+## 1. System Operations (Fixed in v2.4.6)
 **Goal:** Verify the toolkit can control the device.
 
 1.  **Open the App:** Launch "Digital Signage Toolkit" from the desktop.
