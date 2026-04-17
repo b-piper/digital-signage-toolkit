@@ -5,8 +5,6 @@ from PyQt6.QtGui import QPixmap
 from PyQt6.QtWidgets import QGroupBox, QHBoxLayout, QLabel, QPushButton, QVBoxLayout
 
 from .base_tab import BaseTab
-from ..main_window import WorkerThread
-
 
 class RiseVisionTab(BaseTab):
     """Tab for Rise Vision Player operations and Live Previews."""
@@ -221,6 +219,7 @@ class RiseVisionTab(BaseTab):
             else:
                 self.preview_label.setText("Screenshot failed or display unavailable.")
                 
+        from ..main_window import WorkerThread
         self.snap_worker = WorkerThread(run_snap)
         self.snap_worker.finished_signal.connect(on_snap_done)
         self.snap_worker.start()

@@ -8,7 +8,6 @@ from PyQt6.QtWidgets import (
 )
 from PyQt6.QtGui import QColor
 from .base_tab import BaseTab
-from ..main_window import WorkerThread
 
 class FleetDashboardTab(BaseTab):
     """Dashboard for viewing multiple kiosk states."""
@@ -61,6 +60,7 @@ class FleetDashboardTab(BaseTab):
             return results
             
         token = self.main_window.config.get('security.api_token', '')
+        from ..main_window import WorkerThread
         self.worker = WorkerThread(worker_poll, ips, token)
         self.worker.result_signal.connect(self.populate_table)
         self.worker.start()

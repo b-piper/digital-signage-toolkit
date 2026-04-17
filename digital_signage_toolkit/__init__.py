@@ -10,7 +10,7 @@ To keep the codebase layout flexible while maintaining clean imports like
 
 from __future__ import annotations
 
-__version__ = "2.4.6"
+__version__ = "2.4.7"
 
 
 # Source directories have been moved physically into this package.

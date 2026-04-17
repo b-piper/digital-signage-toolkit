@@ -1,3 +1,13 @@
+digital-signage-toolkit (2.4.7-1) unstable; urgency=medium
+
+  * Fix circular import crash preventing application from launching
+  * Remove auto-launch after install to prevent GNOME session restore
+    from repeatedly triggering pkexec password prompt on every boot
+  * Move WorkerThread imports to function-level in fleet_dashboard_tab
+    and rise_vision_tab to break import cycle with main_window
+
+ -- Southwestern CC IT <it@southwesterncc.edu>  Thu, 17 Apr 2026 11:50:00 -0400
+
 digital-signage-toolkit (2.4.5-1) unstable; urgency=medium
 
   * Minor bug fixes and hardening improvements

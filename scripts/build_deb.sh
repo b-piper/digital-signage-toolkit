@@ -303,12 +303,8 @@ if $HAS_ZENITY; then
     if dpkg -s dst-toolkit >/dev/null 2>&1; then
         zenity --info \
             --title="Installation Complete" \
-            --text="Digital Signage Toolkit has been installed successfully!\n\nIt will now launch automatically." \
+            --text="Digital Signage Toolkit has been installed successfully!\n\nYou can launch it from the Applications menu\nor by running: dst-toolkit" \
             --width=400 2>/dev/null
-            
-        # Launch the application dynamically in the background
-        export DISPLAY="${DISPLAY:-:0}"
-        nohup /opt/dst-toolkit/venv/bin/python /opt/dst-toolkit/main.py >/dev/null 2>&1 &
     else
         zenity --error \
             --title="Installation Failed" \
@@ -339,12 +335,10 @@ else
     if dpkg -s dst-toolkit >/dev/null 2>&1; then
         echo "==========================================="
         echo "   Installation Complete!"
-        echo "   Launching Digital Signage Toolkit..."
+        echo ""
+        echo "   Launch from Applications menu or run:"
+        echo "     dst-toolkit"
         echo "==========================================="
-        
-        # Launch the application dynamically in the background
-        export DISPLAY="${DISPLAY:-:0}"
-        nohup /opt/dst-toolkit/venv/bin/python /opt/dst-toolkit/main.py >/dev/null 2>&1 &
     else
         echo "==========================================="
         echo "   Installation FAILED"

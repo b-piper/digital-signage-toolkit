@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "digital-signage-toolkit"
-version = "2.4.6"
+version = "2.4.7"
 description = "Professional GUI application for provisioning and maintaining Ubuntu Digital Signage Kiosks"
 authors = [
     { name = "Southwestern CC IT", email = "it@southwesterncc.edu" }
